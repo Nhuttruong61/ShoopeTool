@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CartOptimizer } from './components/CartOptimizer';
 import { LiveStrikeBar } from './components/LiveStrikeBar';
 import { RunbookForm, type DealRunbookDraft } from './components/RunbookForm';
@@ -64,12 +64,21 @@ function emptyChecklist(): RunbookChecklist {
   };
 }
 
+const STALE_GRACE_MS = 3000;
+
+function refreshStaleTarget(item: DealRunbookItem): DealRunbookItem {
+  if (item.completed || item.targetEpochMs >= Date.now() - STALE_GRACE_MS) return item;
+  return { ...item, targetEpochMs: getNextDropEpochMs(item.slotTime) };
+}
+
 function firstUncompletedId(items: DealRunbookItem[]): string | null {
   return items.find((i) => !i.completed)?.id ?? null;
 }
 
 export function App() {
-  const [initialItems] = useState<DealRunbookItem[]>(() => loadRunbookItems());
+  const [initialItems] = useState<DealRunbookItem[]>(() =>
+    loadRunbookItems().map(refreshStaleTarget),
+  );
   const [items, setItems] = useState<DealRunbookItem[]>(initialItems);
   const [activeId, setActiveId] = useState<string | null>(() =>
     firstUncompletedId(initialItems),
@@ -191,6 +200,11 @@ export function App() {
     if (next) void audio.unlock();
   };
 
+  const handleSelectActive = (id: string) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? refreshStaleTarget(i) : i)));
+    setActiveId(id);
+  };
+
   const handleToggleChecklist = (id: string, key: keyof RunbookChecklist) => {
     setItems((prev) =>
       prev.map((i) =>
@@ -265,10 +279,22 @@ export function App() {
     setTab('runbook');
   };
 
+  const audioUnlocked = useRef(false);
+  const unlockAudioOnce = () => {
+    if (audioUnlocked.current) return;
+    audioUnlocked.current = true;
+    void audio.unlock();
+  };
+
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
 
   return (
-    <div className="app-container" data-phase={countdown.phase}>
+    <div
+      className="app-container"
+      data-phase={countdown.phase}
+      onPointerDownCapture={unlockAudioOnce}
+      onTouchStartCapture={unlockAudioOnce}
+    >
       <header className="app-header">
         <div>
           <h1 className="app-title">ShoopeeTool 11/11 — Trợ Lý Canh Nhịp Săn Mã</h1>
@@ -288,7 +314,10 @@ export function App() {
         onLeadMsChange={handleLeadMsChange}
         onManualAdjustChange={handleManualAdjustChange}
         onTogglePip={() => void handleTogglePip()}
-        onToggleFullscreenHud={() => setIsFullscreenHud((v) => !v)}
+        onToggleFullscreenHud={() => {
+          void audio.unlock();
+          setIsFullscreenHud((v) => !v);
+        }}
         onToggleAudio={handleToggleAudio}
         onQuickCopyAndOpen={(d) => void handleCopyAndOpen(d)}
       />
@@ -317,7 +346,7 @@ export function App() {
           items={items}
           activeId={activeId}
           copiedId={copiedId}
-          onSelectActive={setActiveId}
+          onSelectActive={handleSelectActive}
           onToggleChecklist={handleToggleChecklist}
           onCopyCode={(i) => void handleCopyCode(i)}
           onCopyAndOpenShopee={(i) => void handleCopyAndOpen(i)}
@@ -366,3 +395,4 @@ export function App() {
 }
 
 export default App;
+
