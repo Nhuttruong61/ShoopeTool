@@ -1,16 +1,20 @@
-# Spec: Shopee 11/11 Manual-Assist Companion (ShoopeeTool)
+# Spec: Shopee Max Voucher 365 Ngày & 11/11 Manual-Assist Companion (ShoopeeTool v2.0)
 
 ## Objective
 
-Xây dựng một **Web App di động (PWA)** hợp lệ giúp người mua hàng cá nhân trên Shopee khắc phục việc thao tác tay bị chậm nhịp khi săn voucher giới hạn lượt trong các đợt sale lớn (11/11, 12/12, Flash Sale khung giờ).
+Xây dựng một **Web App di động (PWA)** hợp lệ giúp người mua hàng cá nhân trên Shopee **tối đa hóa lượng voucher áp được quanh năm (365 ngày)** cũng như khắc phục việc thao tác tay bị chậm nhịp khi săn voucher giới hạn lượt trong các đợt sale lớn (Ngày Đôi `1/1`..`12/12`, Sale Giữa Tháng `15/MM`, Lương Về `25/MM`, Thứ 4 Freeship, và Flash Sale khung giờ hàng ngày).
 
-Thay vì can thiệp trái phép vào Shopee (không auto-click, không gọi API Shopee, không vượt anti-bot để bảo vệ tài khoản khỏi lỗi `F01`/`M02`), ứng dụng giải quyết bài toán tốc độ bằng cách **tách toàn bộ khâu chọn sản phẩm & ghép voucher lên trước giờ mở mã**, kết hợp **đồng hồ nổi Picture-in-Picture (PiP) đồng bộ giờ chuẩn đến `0.1s` + âm báo đếm ngược** đè trên góc màn hình điện thoại để người dùng chỉ cần bấm 2 chạm cuối lúc mở sale.
+Thay vì can thiệp trái phép vào Shopee (không auto-click, không gọi API Shopee, không vượt anti-bot để bảo vệ tài khoản khỏi lỗi `F01`/`M02`), ứng dụng giải quyết bài toán **săn nhiều mã nhất & giảm sâu nhất quanh năm** bằng 4 trụ cột v2.0 kết hợp bộ canh giờ chuẩn `0.1s` của v1.0:
 
-### User Stories
+### User Stories (v1.0 + v2.0 Year-Round Max Voucher)
 1. **Chuẩn bị kịch bản săn mã (Pre-flight Runbook):** Trước khung giờ sale (`00:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`), người dùng tạo thẻ săn mã gồm: khung giờ, món cần tick sẵn, mã ký tự (nếu có), phương thức thanh toán, và checklist xác nhận đã đứng chờ sẵn ở màn hình Thanh toán của Shopee.
 2. **Tối ưu ghép giỏ hàng & voucher (Smart Cart-Voucher Splitter):** Khi có nhiều món cần mua và nhiều voucher có mức giảm/đơn tối thiểu khác nhau, người dùng có thể nhập nhanh giá món + điều kiện mã để công cụ gợi ý nên gộp hay tách đơn sao cho tổng tiền giảm cao nhất (và báo còn thiếu bao nhiêu tiền để đạt ngưỡng tối thiểu).
 3. **Đồng hồ nổi PiP & Âm báo nhịp chuẩn giây:** Khi bấm *"Bật Đồng Hồ Nổi"*, trình duyệt mở cửa sổ nhỏ Picture-in-Picture hiển thị giờ chuẩn đã bù độ trễ mạng (`0.1s`), tên mã đang săn, đổi màu cảnh báo (`CHUẨN BỊ` → `SẴN SÀNG` → `BẤM NGAY!`) sớm hơn `leadMs` (mặc định `300ms` bù phản xạ tay) kèm âm báo nhịp *Bíp-Bíp-BẤM!*.
 4. **Copy mã 1 chạm & Mở nhanh Shopee:** Nút bấm 1 chạm sao chép sẵn mã voucher vào Clipboard (hoạt động cả trên HTTPS lẫn mạng LAN Wi-Fi nội bộ) và mở nhanh ứng dụng/trang giỏ hàng Shopee do chính người dùng kích hoạt.
+5. **Radar Lịch Sale 365 Ngày (`getUpcomingSaleRadar`):** Tự động tính theo múi giờ Việt Nam (`UTC+7`) các đợt tung mã gần nhất quanh năm: Làm Mới Kho Mã Hàng Ngày (`00:00`, `09:00`, `12:00`, `18:00`, `21:00`), Siêu Sale Ngày Đôi (`1/1`..`12/12`, tự cuộn qua `01/01` năm sau khi qua 12/12), Sale Giữa Tháng (`15/MM`), Sale Lương Về (`25/MM`), và Thứ 4 Siêu Rẻ & Freeship.
+6. **Trạm Lưu Mã Chính Thống 1 Chạm (`OFFICIAL_VOUCHER_HUBS`):** Danh bạ 8 lối tắt chính thức (`https://shopee.vn/m/...`) mở trực tiếp trang lưu sớm Mã Toàn Sàn, Freeship Xtra, Voucher Xtra, Shopee Video, Shopee Live, ShopeePay, Ưu Đãi Ngân Hàng và Shopee Rewards mà không cần mò tìm trong app.
+7. **Bộ Bóc Tách Nhanh Tin Nhắn Deal (`parseDealTextPaste`):** Dán nguyên đoạn văn bản tổng hợp mã từ các nhóm Zalo / Telegram / Facebook (hỗ trợ tiêu đề khung giờ `🔥 KHUNG 0H:` hoặc giờ đầu dòng `12h:`, `21:00`), tự động lọc mã ký tự (`AFF1122`, `VIDEO50K`, `FMCG100`), loại bỏ từ tiếng Việt/mệnh giá (`100K`, `250K`, `GIAM`, `DON`, `SHOPEE`), trích xuất điều kiện giảm & phương thức thanh toán để nạp thẳng vào Runbook chỉ bằng 1 chạm.
+8. **Bộ Tính Chồng 3 Tầng Voucher & So Kèo Kênh Mua (`compareChannelStacks`):** Mô phỏng chính xác quy tắc chồng 3 tầng mã của Shopee: (Tầng 1) Trừ Mã Shop trước ra `afterShopVnd` → (Tầng 2) Kiểm tra điều kiện `afterShopVnd >= minSpendVnd` của Mã Sàn / Mã Shopee Video (Giỏ vàng) / Mã Shopee Live (Giỏ cam) và cảnh báo ngay **"Bẫy đơn tối thiểu"** nếu trừ Mã Shop xong làm rớt ngưỡng áp Mã Sàn → (Tầng 3) Cộng phí ship sau Freeship và trừ Shopee Xu + ưu đãi thanh toán để chỉ ra kênh mua lời nhất kèm hướng dẫn thao tác từng bước.
 
 ## Tech Stack
 
@@ -55,6 +59,7 @@ C:/O D/ShoopeeTool/
 │   │   ├── pipClock.ts        → Vẽ Canvas 30fps & điều khiển cửa sổ nổi Picture-in-Picture
 │   │   ├── audioCue.ts        → Bộ phát âm báo nhịp Web Audio & ghép track cho PiP
 │   │   ├── optimizer.ts       → Thuật toán gợi ý gộp/tách đơn tối ưu theo điều kiện voucher
+│   │   ├── yearRoundDeals.ts  → Engine v2.0: Radar lịch sale 365 ngày, 8 Hub lưu mã, Parser tin nhắn deal & Bộ tính chồng 3 tầng mã (Thường/Video/Live)
 │   │   ├── clipboard.ts       → Copy mã 1 chạm (có fallback cho HTTP LAN) & deep-link mở Shopee
 │   │   └── storage.ts         → Lưu/đọc kịch bản săn mã vào localStorage có kiểm tra dữ liệu
 │   ├── components/

@@ -111,3 +111,98 @@ export interface ClipboardResult {
   method: 'clipboard-api' | 'exec-command' | 'failed';
   error?: string;
 }
+
+// ============================================================================
+// v2.0 Year-Round Max Voucher (365 Ngày) Contracts
+// ============================================================================
+
+export type SaleCampaignType =
+  | 'double-day'
+  | 'mid-month'
+  | 'payday'
+  | 'wednesday-freeship'
+  | 'daily-restock';
+
+export interface SaleCampaignEvent {
+  id: string;
+  type: SaleCampaignType;
+  dateLabel: string;
+  title: string;
+  badge: string;
+  daysAway: number;
+  peakSlots: string[];
+  tip: string;
+}
+
+export type VoucherHubCategory =
+  | 'platform'
+  | 'video-live'
+  | 'freeship'
+  | 'payment-vip';
+
+export interface VoucherHubShortcut {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  category: VoucherHubCategory;
+  webUrl: string;
+  bestTimeHint: string;
+}
+
+export interface ParsedDealCandidate {
+  id: string;
+  slotTime: string;
+  voucherCode: string;
+  title: string;
+  voucherNote: string;
+  paymentMethod: string;
+  rawLine: string;
+}
+
+export type ShoppingChannel = 'normal' | 'video' | 'live';
+
+export interface ChannelVoucherSpec {
+  label: string;
+  discountType: DiscountType;
+  discountValue: number;
+  maxDiscountVnd?: number;
+  minSpendVnd: number;
+}
+
+export interface ChannelStackInput {
+  itemPriceVnd: number;
+  shopVoucher: ChannelVoucherSpec | null;
+  normalVoucher: ChannelVoucherSpec | null;
+  videoVoucher: ChannelVoucherSpec | null;
+  liveVoucher: ChannelVoucherSpec | null;
+  shippingFeeVnd: number;
+  freeshipCapVnd: number;
+  coinsVnd: number;
+  paymentDiscountVnd: number;
+}
+
+export interface EvaluatedChannelStack {
+  channel: ShoppingChannel;
+  channelLabel: string;
+  itemPriceVnd: number;
+  shopDiscountVnd: number;
+  afterShopVnd: number;
+  platformDiscountVnd: number;
+  platformEligible: boolean;
+  platformShortfallVnd: number;
+  shippingNetVnd: number;
+  coinsUsedVnd: number;
+  paymentDiscountVnd: number;
+  finalPayableVnd: number;
+  totalSavedVnd: number;
+  actionGuide: string;
+}
+
+export interface ChannelStackComparison {
+  evaluations: EvaluatedChannelStack[];
+  bestChannel: ShoppingChannel;
+  extraSavedVsNormalVnd: number;
+  summaryTip: string;
+}
+

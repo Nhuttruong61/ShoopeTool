@@ -172,3 +172,17 @@
 ## Checkpoint: Complete
 - [x] All acceptance criteria in `SPEC.md` met
 - [x] Tests pass, production build clean, ready for user review on mobile & desktop
+
+---
+
+## Phase v2.0: Nâng cấp Săn Tối Đa Voucher Quanh Năm (365 Ngày)
+
+### Task 7 (`v2-core`): Core Domain & Contracts cho Year-Round Max Voucher
+- [x] Mở rộng `src/types/contracts.ts` với đầy đủ kiểu dữ liệu v2.0 (`SaleCampaignType`, `SaleCampaignEvent`, `VoucherHubCategory`, `VoucherHubShortcut`, `ParsedDealCandidate`, `ShoppingChannel`, `ChannelVoucherSpec`, `ChannelStackInput`, `EvaluatedChannelStack`, `ChannelStackComparison`) mà vẫn giữ nguyên 100% export v1.0.
+- [x] Cài đặt `src/lib/yearRoundDeals.ts`:
+  - `getUpcomingSaleRadar(nowEpochMs?)`: Radar lịch sale 365 ngày theo múi giờ Việt Nam (`UTC+7`, độc lập `TZ` máy chủ) gồm Làm Mới Kho Mã Hàng Ngày, Ngày Đôi (`1/1`..`12/12`), Giữa Tháng (`15/MM`), Lương Về (`25/MM`), và Thứ 4 Freeship.
+  - `OFFICIAL_VOUCHER_HUBS`: 8 lối tắt chính thống `https://shopee.vn/m/...` (Mã Toàn Sàn, Freeship Xtra, Voucher Xtra, Shopee Video, Shopee Live, ShopeePay, Ngân Hàng/Đối Tác, Shopee Rewards).
+  - `parseDealTextPaste(rawText)` & `SAMPLE_DEAL_PASTE_TEXT`: Bóc tách nhanh danh sách deal từ Zalo/Telegram/FB thành thẻ săn mã.
+  - `compareChannelStacks(input)` & `DEFAULT_STACK_INPUT`: Tính chồng 3 tầng mã (Shop → Sàn/Video/Live → Ship/Xu/Thanh toán) và phát hiện bẫy hụt đơn tối thiểu sau khi trừ Mã Shop.
+- [x] Viết unit test đầy đủ tại `tests/yearRoundDeals.test.ts` (kiểm thử cả với `TZ=UTC`).
+
