@@ -3,6 +3,90 @@ import type { ClipboardResult } from '../types/contracts';
 const DEFAULT_SHOPEE_WEB_CART = 'https://shopee.vn/cart';
 const DEFAULT_SHOPEE_APP_CART = 'shopeevn://reactPath?path=cart';
 
+export type LaunchPlatform = 'android' | 'ios' | 'desktop';
+export type OpenModePreference = 'auto-app' | 'force-app' | 'web';
+
+export interface ShopeeLaunchTargets {
+  webUrl: string;
+  appDeepLink: string;
+  iosSchemeUrl: string;
+  androidIntentUrl: string;
+}
+
+/**
+ * Detects the current runtime launch platform from userAgent and maxTouchPoints.
+ * - 'android': User agent contains Android
+ * - 'ios': User agent contains iPhone/iPad/iPod, or iPadOS desktop-class Safari (Macintosh + maxTouchPoints > 1)
+ * - 'desktop': Everything else
+ */
+export function detectLaunchPlatform(ua?: string, maxTouchPoints?: number): LaunchPlatform {
+  const effectiveUa =
+    ua !== undefined ? ua : typeof navigator !== 'undefined' ? (navigator.userAgent ?? '') : '';
+  const effectiveTouchPoints =
+    maxTouchPoints !== undefined
+      ? maxTouchPoints
+      : typeof navigator !== 'undefined'
+        ? (navigator.maxTouchPoints ?? 0)
+        : 0;
+
+  if (/\bAndroid\b/i.test(effectiveUa)) {
+    return 'android';
+  }
+
+  if (
+    /\b(iPhone|iPad|iPod)\b/i.test(effectiveUa) ||
+    (/Macintosh/i.test(effectiveUa) && effectiveTouchPoints > 1)
+  ) {
+    return 'ios';
+  }
+
+  return 'desktop';
+}
+
+/**
+ * Normalizes a target URL or relative Shopee path into web, iOS scheme, and Android intent launch targets.
+ * Uses `shopeevn://home?navigate_url=...` which works across all Shopee App routes (/cart, /m/ma-giam-gia, etc.)
+ * and `intent://home?navigate_url=...#Intent;scheme=shopeevn;package=com.shopee.vn;S.browser_fallback_url=...;end`
+ * on Android Chrome for zero-blank-tab native launch with automatic web fallback.
+ */
+export function buildShopeeLaunchTargets(customUrl?: string): ShopeeLaunchTargets {
+  const trimmed = customUrl?.trim();
+
+  if (trimmed && trimmed.toLowerCase().startsWith('shopeevn://')) {
+    const encodedFallback = encodeURIComponent(DEFAULT_SHOPEE_WEB_CART);
+    return {
+      webUrl: DEFAULT_SHOPEE_WEB_CART,
+      appDeepLink: trimmed,
+      iosSchemeUrl: trimmed,
+      androidIntentUrl: `intent://home?navigate_url=${encodedFallback}#Intent;scheme=shopeevn;package=com.shopee.vn;S.browser_fallback_url=${encodedFallback};end`,
+    };
+  }
+
+  let webUrl = DEFAULT_SHOPEE_WEB_CART;
+  if (trimmed) {
+    try {
+      const candidate = trimmed.startsWith('/') ? `https://shopee.vn${trimmed}` : trimmed;
+      const parsed = new URL(candidate);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        webUrl = parsed.toString();
+      }
+    } catch {
+      webUrl = DEFAULT_SHOPEE_WEB_CART;
+    }
+  }
+
+  const encodedWebUrl = encodeURIComponent(webUrl);
+  const iosSchemeUrl = `shopeevn://home?navigate_url=${encodedWebUrl}`;
+  const androidIntentUrl = `intent://home?navigate_url=${encodedWebUrl}#Intent;scheme=shopeevn;package=com.shopee.vn;S.browser_fallback_url=${encodedWebUrl};end`;
+
+  return {
+    webUrl,
+    appDeepLink: iosSchemeUrl,
+    iosSchemeUrl,
+    androidIntentUrl,
+  };
+}
+
 /**
  * Copies a voucher code to the system clipboard.
  * 1. Attempts modern async `navigator.clipboard.writeText(text)` first.
@@ -126,4 +210,67 @@ export function getShopeeCartLinks(customUrl?: string): {
       appDeepLink: DEFAULT_SHOPEE_APP_CART,
     };
   }
+}
+
+function defaultNavigate(url: string, newTab: boolean): void {
+  if (typeof window === 'undefined') return;
+  if (newTab) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    window.location.assign(url);
+  }
+}
+
+/**
+ * Copies optional voucher code FIRST (while document still retains focus),
+ * then launches Shopee natively on Android/iOS (or web new tab on Desktop).
+ */
+export async function copyAndLaunchShopee(
+  options: {
+    voucherCode?: string;
+    targetUrl?: string;
+    mode?: OpenModePreference;
+    navigateFn?: (url: string, newTab: boolean) => void;
+  } = {},
+): Promise<{
+  copied: ClipboardResult | null;
+  launchedUrl: string;
+  usedNativeApp: boolean;
+}> {
+  const { voucherCode, targetUrl, mode = 'auto-app', navigateFn = defaultNavigate } = options;
+
+  let copied: ClipboardResult | null = null;
+  const trimmedCode = voucherCode?.trim();
+  if (trimmedCode) {
+    copied = await copyVoucherCode(trimmedCode);
+  }
+
+  const platform = detectLaunchPlatform();
+  const targets = buildShopeeLaunchTargets(targetUrl);
+
+  if (mode === 'web' || (mode !== 'force-app' && platform === 'desktop')) {
+    navigateFn(targets.webUrl, true);
+    return {
+      copied,
+      launchedUrl: targets.webUrl,
+      usedNativeApp: false,
+    };
+  }
+
+  if (platform === 'android') {
+    navigateFn(targets.androidIntentUrl, false);
+    return {
+      copied,
+      launchedUrl: targets.androidIntentUrl,
+      usedNativeApp: true,
+    };
+  }
+
+  // iOS or force-app on non-Android
+  navigateFn(targets.iosSchemeUrl, false);
+  return {
+    copied,
+    launchedUrl: targets.iosSchemeUrl,
+    usedNativeApp: true,
+  };
 }
