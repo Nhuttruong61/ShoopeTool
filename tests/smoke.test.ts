@@ -19,7 +19,7 @@ describe('Foundation smoke test', () => {
     render(createElement(App));
     expect(
       screen.getByRole('heading', {
-        name: /ShoopeeTool 11\/11 — Trợ Lý Canh Nhịp Săn Mã/i,
+        name: /ShoopeeTool 365 — Trợ Lý Săn Mã & Canh Nhịp Shopee/i,
         level: 1,
       }),
     ).toBeInTheDocument();

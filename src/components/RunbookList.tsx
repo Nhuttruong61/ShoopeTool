@@ -117,8 +117,8 @@ export const RunbookList: React.FC<RunbookListProps> = ({
                     {item.voucherCode ? (
                       <span className="voucher-code-pill">Mã: {item.voucherCode}</span>
                     ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Mã lưu sẵn trên Banner / Ví
+                      <span className="wallet-voucher-badge">
+                        Mã lưu trong Ví Shopee
                       </span>
                     )}
                     {item.voucherNote && (
@@ -160,23 +160,28 @@ export const RunbookList: React.FC<RunbookListProps> = ({
                 })}
               </div>
 
-              <div className="runbook-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => onCopyCode(item)}
-                >
-                  {isCopied
-                    ? `Đã Copy: ${item.voucherCode || 'OK'}`
-                    : `Copy Mã${item.voucherCode ? ` (${item.voucherCode})` : ''}`}
-                </button>
+              <div
+                className="runbook-actions"
+                style={item.voucherCode ? undefined : { gridTemplateColumns: '1fr' }}
+              >
+                {item.voucherCode && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => onCopyCode(item)}
+                  >
+                    {isCopied
+                      ? `Đã Copy: ${item.voucherCode}`
+                      : `Copy Mã (${item.voucherCode})`}
+                  </button>
+                )}
 
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => onCopyAndOpenShopee(item)}
                 >
-                  Copy Mã + Mở Shopee
+                  {item.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
                 </button>
               </div>
 

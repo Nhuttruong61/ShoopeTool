@@ -1,13 +1,24 @@
 import type { CartItem, DealRunbookItem, VoucherRule } from '../types/contracts';
+import type { OpenModePreference } from './clipboard';
 
 export const STORAGE_KEYS = {
   RUNBOOK_ITEMS: 'shoopeetool_runbook_items_v1',
   LEAD_MS: 'shoopeetool_lead_ms_v1',
   MANUAL_ADJUST_MS: 'shoopeetool_manual_adjust_ms_v1',
+  OPEN_MODE: 'shoopeetool_open_mode_v1',
 } as const;
 
 export const DEFAULT_LEAD_MS = 300;
 export const DEFAULT_MANUAL_ADJUST_MS = 0;
+export const DEFAULT_OPEN_MODE: OpenModePreference = 'auto-app';
+
+export const LEGACY_FAKE_VOUCHER_CODES = new Set([
+  'SHOPEE1111TS100K',
+  'XTRA1111G15',
+  'FLASH12H50K',
+  'LIVE1111DEM',
+  'MINI1111G25K',
+]);
 
 const VN_OFFSET_MS = 7 * 3600_000;
 const DAY_MS = 24 * 3600_000;
@@ -40,10 +51,10 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     id: 'slot-0000-toan-san',
     slotTime: '00:00',
     targetEpochMs: resolveSlotTargetEpochMs('00:00'),
-    title: 'Mã Toàn Sàn 20% tối đa 100K',
-    itemsSummary: 'Tai nghe Bluetooth + Cáp sạc nhanh PD 65W',
-    voucherCode: 'SHOPEE1111TS100K',
-    voucherNote: 'Giảm 20% tối đa 100.000đ cho đơn từ 300.000đ — Mở đúng 00:00:00',
+    title: 'Đợt Mở Mã Toàn Sàn & Freeship 0đ',
+    itemsSummary: 'Tick sẵn món cần mua từ phút :58 — Chọn mã đã lưu trong Ví Voucher',
+    voucherCode: '',
+    voucherNote: 'Mã lưu sẵn trong Ví Voucher / Banner Toàn Sàn — Mở lượt đúng 00:00:00',
     paymentMethod: 'ShopeePay',
     shopeeUrl: 'https://shopee.vn/cart',
     checklist: {
@@ -57,12 +68,12 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     id: 'slot-0900-voucher-xtra',
     slotTime: '09:00',
     targetEpochMs: resolveSlotTargetEpochMs('09:00'),
-    title: 'Voucher Xtra 15%',
-    itemsSummary: 'Kem chống nắng La Roche-Posay + Nước tẩy trang',
-    voucherCode: 'XTRA1111G15',
-    voucherNote: 'Giảm 15% tối đa 70.000đ cho đơn từ 200.000đ có gắn nhãn Voucher Xtra',
+    title: 'Châm Lượt Voucher Xtra & Mall',
+    itemsSummary: 'Tick sẵn hàng gắn nhãn Voucher Xtra / Shopee Mall trong Giỏ hàng',
+    voucherCode: '',
+    voucherNote: 'Mã lưu Ví Voucher Xtra 15%–20% + Mã Shop — Châm thêm lượt lúc 09:00',
     paymentMethod: 'SPayLater',
-    shopeeUrl: 'https://shopee.vn/cart',
+    shopeeUrl: 'https://shopee.vn/m/voucher-xtra',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -74,12 +85,12 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     id: 'slot-1200-flash-50k',
     slotTime: '12:00',
     targetEpochMs: resolveSlotTargetEpochMs('12:00'),
-    title: 'Flash Voucher Giảm 50K đơn 250K',
-    itemsSummary: 'Áo khoác gió chống UV + Tất thể thao cổ ngắn',
-    voucherCode: 'FLASH12H50K',
-    voucherNote: 'Giảm thẳng 50.000đ cho đơn từ 250.000đ — Số lượng cực giới hạn khung 12h trưa',
+    title: 'Châm Lượt Giữa Trưa Freeship & Xtra',
+    itemsSummary: 'Tick sẵn món từ phút 11:58 — Áp mã Freeship 0đ + Voucher Xtra trong Ví',
+    voucherCode: '',
+    voucherNote: 'Shopee châm thêm lượt Freeship 0đ, Voucher Xtra & Mã Video khung 12h trưa',
     paymentMethod: 'ShopeePay',
-    shopeeUrl: 'https://shopee.vn/cart',
+    shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -91,12 +102,12 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     id: 'slot-2100-live-1111',
     slotTime: '21:00',
     targetEpochMs: resolveSlotTargetEpochMs('21:00'),
-    title: 'Mã Live 11/11',
-    itemsSummary: 'Chuột không dây gaming + Lót chuột cỡ lớn (rổ Live)',
-    voucherCode: 'LIVE1111DEM',
-    voucherNote: 'Giảm 25% tối đa 80.000đ đơn từ 150.000đ cho sản phẩm thêm từ giỏ Shopee Live',
+    title: 'Cao Điểm Voucher Shopee Live & Xả Cuối Ngày',
+    itemsSummary: 'Thêm món từ Giỏ cam Livestream trước 20:58 — Chọn mã Live trong Ví',
+    voucherCode: '',
+    voucherNote: 'Mã độc quyền cho sản phẩm gắn tag Shopee Live (tự có trong Ví Voucher)',
     paymentMethod: 'ShopeePay',
-    shopeeUrl: 'https://shopee.vn/cart',
+    shopeeUrl: 'https://shopee.vn/m/shopee-live',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -109,8 +120,8 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
 export const DEFAULT_SAMPLE_VOUCHERS: VoucherRule[] = [
   {
     id: 'voucher-toan-san-20p-100k',
-    label: 'Mã Toàn Sàn 20% tối đa 100K (đơn từ 300K)',
-    code: 'SHOPEE1111TS100K',
+    label: 'Mã Video 20% tối đa 100K (đơn từ 300K)',
+    code: undefined,
     minSpendVnd: 300_000,
     discountType: 'percent',
     discountValue: 20,
@@ -119,8 +130,8 @@ export const DEFAULT_SAMPLE_VOUCHERS: VoucherRule[] = [
   },
   {
     id: 'voucher-flash-50k-250k',
-    label: 'Giảm 50K đơn từ 250K',
-    code: 'FLASH12H50K',
+    label: 'Mã Khung Giờ Giảm 50K (đơn từ 250K)',
+    code: undefined,
     minSpendVnd: 250_000,
     discountType: 'flat',
     discountValue: 50_000,
@@ -130,7 +141,7 @@ export const DEFAULT_SAMPLE_VOUCHERS: VoucherRule[] = [
   {
     id: 'voucher-xtra-15p-70k',
     label: 'Voucher Xtra 15% tối đa 70K (đơn từ 200K)',
-    code: 'XTRA1111G15',
+    code: undefined,
     minSpendVnd: 200_000,
     discountType: 'percent',
     discountValue: 15,
@@ -139,8 +150,8 @@ export const DEFAULT_SAMPLE_VOUCHERS: VoucherRule[] = [
   },
   {
     id: 'voucher-mini-25k-120k',
-    label: 'Mã Giảm 25K đơn từ 120K',
-    code: 'MINI1111G25K',
+    label: 'Mã Shop Giảm 25K (đơn từ 120K)',
+    code: undefined,
     minSpendVnd: 120_000,
     discountType: 'flat',
     discountValue: 25_000,
@@ -229,10 +240,15 @@ export function loadRunbookItems(): DealRunbookItem[] {
     if (!Array.isArray(parsed)) {
       return cloneDefaultRunbook();
     }
-    const validItems = parsed.filter(isValidRunbookItem).map((item) => ({
-      ...item,
-      checklist: { ...item.checklist },
-    }));
+    const validItems = parsed.filter(isValidRunbookItem).map((item) => {
+      const cleanCode = item.voucherCode.trim().toUpperCase();
+      const scrubbedCode = LEGACY_FAKE_VOUCHER_CODES.has(cleanCode) ? '' : item.voucherCode;
+      return {
+        ...item,
+        voucherCode: scrubbedCode,
+        checklist: { ...item.checklist },
+      };
+    });
     // If parsed array had elements but none were valid objects, recover with defaults
     if (parsed.length > 0 && validItems.length === 0) {
       return cloneDefaultRunbook();
@@ -326,6 +342,34 @@ export function saveManualAdjustMs(ms: number): void {
     }
     const clamped = Math.max(-10_000, Math.min(10_000, Math.round(ms)));
     window.localStorage.setItem(STORAGE_KEYS.MANUAL_ADJUST_MS, String(clamped));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function loadOpenMode(): OpenModePreference {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return DEFAULT_OPEN_MODE;
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEYS.OPEN_MODE);
+    if (raw === 'auto-app' || raw === 'force-app' || raw === 'web') {
+      return raw;
+    }
+    return DEFAULT_OPEN_MODE;
+  } catch {
+    return DEFAULT_OPEN_MODE;
+  }
+}
+
+export function saveOpenMode(mode: OpenModePreference): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    if (mode === 'auto-app' || mode === 'force-app' || mode === 'web') {
+      window.localStorage.setItem(STORAGE_KEYS.OPEN_MODE, mode);
+    }
   } catch {
     // Ignore storage errors
   }

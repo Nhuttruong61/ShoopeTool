@@ -3,17 +3,24 @@ import { CartOptimizer } from './components/CartOptimizer';
 import { LiveStrikeBar } from './components/LiveStrikeBar';
 import { RunbookForm, type DealRunbookDraft } from './components/RunbookForm';
 import { RunbookList } from './components/RunbookList';
+import { VoucherMaxHub } from './components/VoucherMaxHub';
 import { AudioCueController } from './lib/audioCue';
-import { copyVoucherCode, getShopeeCartLinks } from './lib/clipboard';
+import {
+  copyAndLaunchShopee,
+  copyVoucherCode,
+  type OpenModePreference,
+} from './lib/clipboard';
 import { formatVnd, optimizeCartSplit } from './lib/optimizer';
 import { detectPipSupport, PipClockController } from './lib/pipClock';
 import {
   DEFAULT_SAMPLE_VOUCHERS,
   loadLeadMs,
   loadManualAdjustMs,
+  loadOpenMode,
   loadRunbookItems,
   saveLeadMs,
   saveManualAdjustMs,
+  saveOpenMode,
   saveRunbookItems,
 } from './lib/storage';
 import {
@@ -23,17 +30,20 @@ import {
 } from './lib/timeSync';
 import type {
   DealRunbookItem,
+  EvaluatedChannelStack,
   OrderSplitPlan,
+  ParsedDealCandidate,
   PipOverlayPayload,
   RunbookChecklist,
   StrikeCountdownState,
   TimeSyncSnapshot,
 } from './types/contracts';
 
-type TabKey = 'runbook' | 'add' | 'optimizer' | 'guide';
+type TabKey = 'runbook' | 'maxhub' | 'add' | 'optimizer' | 'guide';
 
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: 'runbook', label: 'Kịch bản săn' },
+  { key: 'maxhub', label: '🔥 Kho Mã & 365' },
   { key: 'add', label: 'Thêm ca săn' },
   { key: 'optimizer', label: 'Tối ưu tách đơn' },
   { key: 'guide', label: 'Hướng dẫn ĐT' },
@@ -85,6 +95,7 @@ export function App() {
   );
   const [leadMs, setLeadMs] = useState<number>(() => loadLeadMs());
   const [manualAdjustMs, setManualAdjustMs] = useState<number>(() => loadManualAdjustMs());
+  const [openMode, setOpenMode] = useState<OpenModePreference>(() => loadOpenMode());
   const [syncState, setSyncState] = useState<TimeSyncSnapshot>(() => ({
     synced: false,
     offsetMs: 0,
@@ -96,6 +107,7 @@ export function App() {
   const [tab, setTab] = useState<TabKey>('runbook');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isPipActive, setIsPipActive] = useState(false);
+  const [pipError, setPipError] = useState<string | null>(null);
   const [isFullscreenHud, setIsFullscreenHud] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
 
@@ -117,6 +129,7 @@ export function App() {
   useEffect(() => saveRunbookItems(items), [items]);
   useEffect(() => saveLeadMs(leadMs), [leadMs]);
   useEffect(() => saveManualAdjustMs(manualAdjustMs), [manualAdjustMs]);
+  useEffect(() => saveOpenMode(openMode), [openMode]);
 
   // Time sync
   const syncNow = useCallback(async (adjust: number) => {
@@ -145,17 +158,16 @@ export function App() {
       const next = computeStrikeCountdown(Date.now(), s, d?.targetEpochMs ?? null, l);
       setCountdown(next);
       audio.handleCountdownTick(next);
-      if (pip.isActive()) {
-        const payload: PipOverlayPayload = {
-          clockText: next.formattedClock,
-          countdownText: next.formattedRemaining,
-          phase: next.phase,
-          bannerText: BANNER_BY_PHASE[next.phase],
-          voucherLabel: d?.title ?? 'Chưa chọn ca săn',
-          voucherCode: d?.voucherCode || undefined,
-        };
-        pip.update(payload);
-      } else {
+      const payload: PipOverlayPayload = {
+        clockText: next.formattedClock,
+        countdownText: next.formattedRemaining,
+        phase: next.phase,
+        bannerText: BANNER_BY_PHASE[next.phase],
+        voucherLabel: d?.title ?? 'Chưa chọn ca săn',
+        voucherCode: d?.voucherCode || undefined,
+      };
+      pip.update(payload);
+      if (!pip.isActive()) {
         // PiP window closed externally
         setIsPipActive((prev) => (prev ? false : prev));
       }
@@ -185,12 +197,18 @@ export function App() {
     if (pip.isActive()) {
       await pip.close();
       setIsPipActive(false);
+      setPipError(null);
       return;
     }
     void audio.unlock();
     const ok = await pip.open();
     setIsPipActive(ok);
-    if (!ok) setIsFullscreenHud(true);
+    if (!ok) {
+      setPipError(pip.getLastError());
+      setIsFullscreenHud(true);
+    } else {
+      setPipError(null);
+    }
   };
 
   const handleToggleAudio = () => {
@@ -237,10 +255,93 @@ export function App() {
   };
 
   const handleCopyAndOpen = async (item: DealRunbookItem) => {
-    // Open synchronously within the user gesture so popup blockers allow it.
-    const { webUrl } = getShopeeCartLinks(item.shopeeUrl);
-    window.open(webUrl, '_blank', 'noopener,noreferrer');
-    await handleCopyCode(item);
+    const res = await copyAndLaunchShopee({
+      voucherCode: item.voucherCode || undefined,
+      targetUrl: item.shopeeUrl,
+      mode: openMode,
+    });
+    if (res.copied?.ok) {
+      setCopiedId(item.id);
+    }
+  };
+
+  const handleOpenShopeeUrl = async (url: string, voucherCode?: string) => {
+    await copyAndLaunchShopee({
+      voucherCode,
+      targetUrl: url,
+      mode: openMode,
+    });
+  };
+
+  const handleSelectOrCreateSlot = (slotTime: string, campaignTitle: string, tip: string) => {
+    const existing = items.find((i) => !i.completed && i.slotTime === slotTime);
+    if (existing) {
+      setItems((prev) => prev.map((i) => (i.id === existing.id ? refreshStaleTarget(i) : i)));
+      setActiveId(existing.id);
+      setTab('runbook');
+      return;
+    }
+    const deal: DealRunbookItem = {
+      id: makeId(),
+      slotTime,
+      targetEpochMs: getNextDropEpochMs(slotTime),
+      title: `${campaignTitle} (${slotTime})`,
+      itemsSummary: 'Tick sẵn món cần mua — Chọn mã đã lưu trong Ví Voucher',
+      voucherCode: '',
+      voucherNote: tip,
+      paymentMethod: 'ShopeePay',
+      shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
+      checklist: emptyChecklist(),
+      completed: false,
+    };
+    setItems((prev) => [...prev, deal]);
+    setActiveId(deal.id);
+    setTab('runbook');
+  };
+
+  const handleImportParsedDeals = (deals: ParsedDealCandidate[]) => {
+    if (deals.length === 0) return;
+    const created: DealRunbookItem[] = deals.map((d) => ({
+      id: makeId(),
+      slotTime: d.slotTime,
+      targetEpochMs: getNextDropEpochMs(d.slotTime),
+      title: d.title,
+      itemsSummary: 'Tick sẵn món đủ đơn tối thiểu trước giờ mở mã',
+      voucherCode: d.voucherCode,
+      voucherNote: d.voucherNote,
+      paymentMethod: d.paymentMethod,
+      shopeeUrl: 'https://shopee.vn/cart',
+      checklist: emptyChecklist(),
+      completed: false,
+    }));
+    setItems((prev) => [...prev, ...created]);
+    setActiveId(created[0].id);
+    setTab('runbook');
+  };
+
+  const handleCreateChannelReminder = (evaluation: EvaluatedChannelStack, slotTime: string) => {
+    const channelUrl =
+      evaluation.channel === 'video'
+        ? 'https://shopee.vn/m/shopee-video'
+        : evaluation.channel === 'live'
+          ? 'https://shopee.vn/m/shopee-live'
+          : 'https://shopee.vn/cart';
+    const deal: DealRunbookItem = {
+      id: makeId(),
+      slotTime,
+      targetEpochMs: getNextDropEpochMs(slotTime),
+      title: `Mua qua ${evaluation.channelLabel}`,
+      itemsSummary: evaluation.actionGuide,
+      voucherCode: '',
+      voucherNote: `Thanh toán dự kiến ${formatVnd(evaluation.finalPayableVnd)} (Tiết kiệm tổng ${formatVnd(evaluation.totalSavedVnd)})`,
+      paymentMethod: 'ShopeePay',
+      shopeeUrl: channelUrl,
+      checklist: emptyChecklist(),
+      completed: false,
+    };
+    setItems((prev) => [...prev, deal]);
+    setActiveId(deal.id);
+    setTab('runbook');
   };
 
   const handleAddDeal = (draft: DealRunbookDraft) => {
@@ -284,6 +385,7 @@ export function App() {
     if (audioUnlocked.current) return;
     audioUnlocked.current = true;
     void audio.unlock();
+    (pip as unknown as { warmup?: () => void }).warmup?.();
   };
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -297,9 +399,34 @@ export function App() {
     >
       <header className="app-header">
         <div>
-          <h1 className="app-title">ShoopeeTool 11/11 — Trợ Lý Canh Nhịp Săn Mã</h1>
-          <p className="app-subtitle">Chuẩn bị trước, chỉ cần bấm 2 chạm lúc mở sale.</p>
+          <h1 className="app-title">ShoopeeTool 365 — Trợ Lý Săn Mã &amp; Canh Nhịp Shopee</h1>
+          <p className="app-subtitle">
+            Canh giờ chuẩn 0.1s, mở thẳng kho mã thật trong App Shopee &amp; tối ưu chồng 3 tầng mã
+            quanh năm.
+          </p>
         </div>
+
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.78rem',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <select
+            aria-label="Chế độ mở Shopee"
+            data-testid="open-mode-select"
+            className="open-mode-select"
+            value={openMode}
+            onChange={(e) => setOpenMode(e.target.value as OpenModePreference)}
+          >
+            <option value="auto-app">📱 Mở App Shopee (Tự động)</option>
+            <option value="force-app">🚀 Ép mở App Shopee</option>
+            <option value="web">🌐 Mở Web</option>
+          </select>
+        </label>
       </header>
 
       <LiveStrikeBar
@@ -308,6 +435,8 @@ export function App() {
         activeDeal={activeDeal}
         pipSupport={pipSupport}
         isPipActive={isPipActive}
+        pipError={pipError}
+        onMountInlinePipVideo={(el) => pip.mountInlineVideo(el)}
         isFullscreenHud={isFullscreenHud}
         audioEnabled={audioEnabled}
         onSyncNow={() => void syncNow(manualAdjustMs)}
@@ -352,6 +481,15 @@ export function App() {
           onCopyAndOpenShopee={(i) => void handleCopyAndOpen(i)}
           onToggleCompleted={handleToggleCompleted}
           onDelete={handleDelete}
+        />
+      )}
+
+      {tab === 'maxhub' && (
+        <VoucherMaxHub
+          onOpenShopeeUrl={(url, code) => void handleOpenShopeeUrl(url, code)}
+          onSelectOrCreateSlot={handleSelectOrCreateSlot}
+          onImportParsedDeals={handleImportParsedDeals}
+          onCreateChannelReminder={handleCreateChannelReminder}
         />
       )}
 

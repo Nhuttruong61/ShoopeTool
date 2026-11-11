@@ -13,6 +13,8 @@ export interface LiveStrikeBarProps {
   activeDeal: DealRunbookItem | null;
   pipSupport: PipSupportInfo;
   isPipActive: boolean;
+  pipError?: string | null;
+  onMountInlinePipVideo?: (container: HTMLElement | null) => void;
   isFullscreenHud: boolean;
   audioEnabled: boolean;
   onSyncNow: () => void;
@@ -39,6 +41,8 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
   activeDeal,
   pipSupport,
   isPipActive,
+  pipError,
+  onMountInlinePipVideo,
   isFullscreenHud,
   audioEnabled,
   onSyncNow,
@@ -125,8 +129,8 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
             {activeDeal.voucherCode ? (
               <span className="voucher-code-pill">Mã: {activeDeal.voucherCode}</span>
             ) : (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Mã lưu sẵn trong Ví
+              <span className="wallet-voucher-badge">
+                Mã lưu trong Ví Shopee
               </span>
             )}
           </div>
@@ -152,7 +156,7 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
                 style={{ minHeight: '48px', padding: '8px 14px', fontSize: '0.85rem' }}
                 onClick={() => onQuickCopyAndOpen(activeDeal)}
               >
-                Copy Mã + Mở Shopee
+                {activeDeal.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
               </button>
             )}
           </div>
@@ -234,7 +238,24 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
         </button>
       </div>
 
-      {pipSupport.fallbackHudOnly && (
+      {pipError && (
+        <div
+          className="shortfall-alert"
+          style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+          data-testid="pip-error-banner"
+        >
+          <span>{pipError}</span>
+          {onMountInlinePipVideo && (
+            <div
+              ref={(el) => onMountInlinePipVideo(el)}
+              style={{ display: 'flex', justifyContent: 'center' }}
+              data-testid="inline-pip-video-slot"
+            />
+          )}
+        </div>
+      )}
+
+      {pipSupport.fallbackHudOnly && !pipError && (
         <p
           style={{
             margin: '10px 0 0',

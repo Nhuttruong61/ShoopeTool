@@ -116,7 +116,7 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
             <input
               type="text"
               className="text-input"
-              placeholder="VD: Săn mã Mall 20% đêm 11/11"
+              placeholder="VD: Săn mã Mall 20% khung 0h"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />

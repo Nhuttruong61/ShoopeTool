@@ -39,8 +39,8 @@ const SAMPLE_1111_ITEMS: CartItem[] = [
 const SAMPLE_1111_VOUCHERS: VoucherRule[] = [
   {
     id: 'sample-v-1',
-    label: 'Mã 11/11 Giảm 20% tối đa 100k (Đơn từ 500k)',
-    code: '1111MALL100K',
+    label: 'Mã Shopee Video 20% tối đa 100k (Đơn từ 500k)',
+    code: undefined,
     minSpendVnd: 500_000,
     discountType: 'percent',
     discountValue: 20,
@@ -49,15 +49,15 @@ const SAMPLE_1111_VOUCHERS: VoucherRule[] = [
   {
     id: 'sample-v-2',
     label: 'Mã Khung Giờ Giảm 60k (Đơn từ 400k)',
-    code: 'FLASH60K',
+    code: undefined,
     minSpendVnd: 400_000,
     discountType: 'flat',
     discountValue: 60_000,
   },
   {
     id: 'sample-v-3',
-    label: 'Mã Toàn Sàn Giảm 15% tối đa 150k (Đơn từ 1 triệu)',
-    code: 'SIEUSALE150K',
+    label: 'Voucher Xtra Giảm 15% tối đa 150k (Đơn từ 1 triệu)',
+    code: undefined,
     minSpendVnd: 1_000_000,
     discountType: 'percent',
     discountValue: 15,
@@ -182,7 +182,7 @@ export const CartOptimizer: React.FC<CartOptimizerProps> = ({
           style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.84rem' }}
           onClick={handleLoadSample}
         >
-          Nạp giỏ mẫu 11/11
+          Nạp giỏ mẫu thử
         </button>
       </div>
 

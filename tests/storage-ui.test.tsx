@@ -25,11 +25,19 @@ describe('App integration', () => {
 
   it('renders header, tabs and default runbook', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/ShoopeeTool 11\/11/);
-    for (const name of ['Kịch bản săn', 'Thêm ca săn', 'Tối ưu tách đơn', 'Hướng dẫn ĐT']) {
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/ShoopeeTool 365/);
+    for (const name of [
+      'Kịch bản săn',
+      '🔥 Kho Mã & 365',
+      'Thêm ca săn',
+      'Tối ưu tách đơn',
+      'Hướng dẫn ĐT',
+    ]) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument();
     }
-    expect(screen.getByText('Mã Toàn Sàn 20% tối đa 100K', { selector: 'h3' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Đợt Mở Mã Toàn Sàn & Freeship 0đ', { selector: 'h3' }),
+    ).toBeInTheDocument();
   });
 
   it('toggles checklist and persists to localStorage', () => {
@@ -44,7 +52,7 @@ describe('App integration', () => {
   it('adds a new deal via the form and selects it', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Thêm ca săn' }));
-    fireEvent.change(screen.getByPlaceholderText('VD: Săn mã Mall 20% đêm 11/11'), {
+    fireEvent.change(screen.getByPlaceholderText('VD: Săn mã Mall 20% khung 0h'), {
       target: { value: 'Ca thử nghiệm' },
     });
     fireEvent.change(screen.getByPlaceholderText('VD: AFF1111HOANXU'), {
@@ -59,13 +67,22 @@ describe('App integration', () => {
     expect(screen.getByTestId('runbook-card-' + added!.id)).toHaveTextContent('Đang canh ca này');
   });
 
-  it('copies a voucher code', async () => {
+  it('copies a user-entered voucher code', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     render(<App />);
-    fireEvent.click(screen.getAllByRole('button', { name: /^Copy Mã \(SHOPEE1111TS100K\)/ })[0]);
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('SHOPEE1111TS100K'));
-    expect(await screen.findByText('Đã Copy: SHOPEE1111TS100K')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Thêm ca săn' }));
+    fireEvent.change(screen.getByPlaceholderText('VD: Săn mã Mall 20% khung 0h'), {
+      target: { value: 'Ca có mã ký tự' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('VD: AFF1111HOANXU'), {
+      target: { value: 'REALCODE99K' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Thêm Vào Kịch Bản Săn Mã/ }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Mã (REALCODE99K)' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('REALCODE99K'));
+    expect(await screen.findByText('Đã Copy: REALCODE99K')).toBeInTheDocument();
   });
 
   it('opens Shopee safely with noopener,noreferrer', async () => {
@@ -75,7 +92,7 @@ describe('App integration', () => {
     });
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(<App />);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy Mã + Mở Shopee' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mở App Shopee' })[0]);
     await waitFor(() => expect(open).toHaveBeenCalled());
     expect(open.mock.calls[0][1]).toBe('_blank');
     expect(open.mock.calls[0][2]).toBe('noopener,noreferrer');

@@ -700,3 +700,205 @@ body {
   font-weight: 700;
   font-size: 0.92rem;
 }
+
+/* Wallet Voucher Badge & Open Mode Selector */
+.wallet-voucher-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background-color: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.open-mode-select {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* VoucherMaxHub (v2.0 365-Day Max Voucher Hub) */
+.maxhub-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.real-voucher-explainer {
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.45;
+}
+
+.radar-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.radar-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radar-card.is-today {
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25);
+}
+
+.radar-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.radar-date-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fdba74;
+}
+
+.radar-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  background-color: rgba(148, 163, 184, 0.2);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.radar-badge.is-live {
+  background-color: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+}
+
+.radar-slots-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.radar-slot-btn {
+  min-height: 48px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 520px) {
+  .hub-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.hub-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hub-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hub-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  background-color: rgba(238, 77, 45, 0.2);
+  color: #fed7aa;
+  border: 1px solid rgba(238, 77, 45, 0.45);
+  white-space: nowrap;
+}
+
+.sample-syntax-warning {
+  background-color: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.parsed-deals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.parsed-deal-item {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.channel-input-box {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.channel-eval-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.channel-eval-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.channel-eval-card.is-best-channel {
+  border: 2px solid var(--accent-emerald);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+}

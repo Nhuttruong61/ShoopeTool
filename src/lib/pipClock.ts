@@ -15,7 +15,6 @@ interface WebkitVideoElement extends HTMLVideoElement {
   webkitSupportsPresentationMode?: (mode: string) => boolean;
   webkitSetPresentationMode?: (mode: string) => void;
   webkitPresentationMode?: string;
-  disablePictureInPicture?: boolean;
 }
 
 interface CanvasCaptureMediaStreamTrack extends MediaStreamTrack {

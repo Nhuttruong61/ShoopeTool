@@ -1,6 +1,11 @@
-# ShoopeeTool 11/11 — Trợ Lý Canh Nhịp Săn Mã
+# ShoopeeTool 365 — Trợ Lý Săn Mã & Canh Nhịp Shopee
 
-Web app di động (PWA) hỗ trợ **thao tác tay** khi săn voucher giới hạn lượt trên Shopee: chuẩn bị sẵn kịch bản, tính gộp/tách đơn, copy mã 1 chạm và **đồng hồ nổi chuẩn 0.1s** có âm báo đếm ngược.
+Web app di động (PWA) hỗ trợ **thao tác tay** khi săn voucher giới hạn lượt trên Shopee **quanh năm (365 ngày)**:
+- **Mở thẳng App Shopee trên điện thoại (`shopeevn://` & Android `intent://`)**: Bấm 1 chạm vào thẳng đúng trang lưu mã thật trong App Shopee (Toàn Sàn, Voucher Xtra, Freeship, Shopee Video, Shopee Live, ShopeePay, Ngân Hàng, VIP) hoặc Giỏ hàng — tự động copy mã ký tự trước khi chuyển app.
+- **Không chứa mã giả (Mock Codes)**: Phân biệt rõ **Mã Lưu Ví (~90% mã Shopee)** và **Mã Ký Tự Nhập Tay (~10%)**.
+- **Bóc Tách Nhanh Bài Đăng Mã Ký Tự (Smart Paste)**: Dán tin nhắn phím mã từ Telegram/Zalo/Facebook trước giờ mở mã 15 phút để tự động tách Mã + Khung giờ + Điều kiện đưa vào kịch bản đếm ngược.
+- **Bộ Tính Chồng 3 Tầng Mã & So Kênh Mua**: So sánh **Giỏ Hàng Thường (Xtra)** vs **Shopee Video (Giỏ Vàng)** vs **Shopee Live (Giỏ Cam)** theo đúng cơ chế 3 tầng `[1. Mã Shop] + [2. Mã Sàn/Video/Live] + [3. Freeship + Xu/TT]`, tự cảnh báo bẫy hụt đơn tối thiểu sau khi trừ Mã Shop.
+- **Đồng hồ nổi chuẩn 0.1s (PiP / HUD) & Tối ưu Gộp/Tách đơn**.
 
 > **An toàn:** ứng dụng **không** auto-click, không gọi API Shopee, không can thiệp trang Shopee, không lưu tài khoản/cookie/token. Bạn tự bấm mọi thao tác trên Shopee. Dữ liệu chỉ nằm trong `localStorage` của trình duyệt.
 

@@ -1,7 +1,7 @@
 {
-  "name": "ShoopeeTool 11/11 — Trợ Lý Canh Nhịp Săn Mã",
-  "short_name": "ShoopeeTool",
-  "description": "Chuẩn bị kịch bản săn voucher, đồng hồ nổi chuẩn 0.1s và tối ưu tách đơn.",
+  "name": "ShoopeeTool 365 — Trợ Lý Săn Mã & Canh Nhịp Shopee",
+  "short_name": "ShoopeeTool 365",
+  "description": "Canh nhịp 0.1s, mở thẳng kho mã thật trong App Shopee, bóc tách mã ký tự và tính chồng 3 tầng mã quanh năm.",
   "lang": "vi",
   "start_url": "/",
   "scope": "/",
