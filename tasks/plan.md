@@ -47,26 +47,26 @@ flowchart TD
 Chi tiết từng task được quản lý tại `tasks/todo.md`:
 
 ### Phase 1: Foundation
-- [ ] Task 1: Khởi tạo dự án Vite + React + TypeScript + Vitest và định nghĩa `src/types/contracts.ts`
+- [x] Task 1: Khởi tạo dự án Vite + React + TypeScript + Vitest và định nghĩa `src/types/contracts.ts`
 
 ### Checkpoint: Foundation
-- [ ] `npm run typecheck` và `npm test` chạy sạch trên khung dự án gốc
+- [x] `npm run typecheck` và `npm test` chạy sạch trên khung dự án gốc
 
 ### Phase 2: Parallel Core Modules (Điều phối 3 Gemini Agents song song)
-- [ ] Task 2 (`time-pip`): Xây dựng Engine đồng bộ giờ chuẩn, Âm báo nhịp & Cửa sổ nổi PiP + Unit Tests
-- [ ] Task 3 (`voucher-brain`): Xây dựng Bộ tối ưu ghép đơn – voucher, Lưu trữ kịch bản & Clipboard LAN fallback + Unit Tests
-- [ ] Task 4 (`mobile-ui`): Xây dựng bộ giao diện Mobile-First (LiveStrikeBar, RunbookList, RunbookForm, CartOptimizer)
+- [x] Task 2 (`time-pip`): Xây dựng Engine đồng bộ giờ chuẩn, Âm báo nhịp & Cửa sổ nổi PiP + Unit Tests
+- [x] Task 3 (`voucher-brain`): Xây dựng Bộ tối ưu ghép đơn – voucher, Lưu trữ kịch bản & Clipboard LAN fallback + Unit Tests
+- [x] Task 4 (`mobile-ui`): Xây dựng bộ giao diện Mobile-First (LiveStrikeBar, RunbookList, RunbookForm, CartOptimizer)
 
 ### Checkpoint: Core Modules
-- [ ] Toàn bộ unit tests của `timeSync` và `optimizer` pass, components biên dịch không lỗi kiểu
+- [x] Toàn bộ unit tests của `timeSync` và `optimizer` pass, components biên dịch không lỗi kiểu
 
 ### Phase 3: Integration & Verification
-- [ ] Task 5 (`integrator`): Tích hợp `App.tsx`, cấu hình PWA `manifest.webmanifest` & viết Integration Tests
-- [ ] Task 6 (`verifier`): Kiểm định toàn diện chất lượng, build production & kiểm tra danh mục nghiệm thu `SPEC.md`
+- [x] Task 5 (`integrator`): Tích hợp `App.tsx`, cấu hình PWA `manifest.webmanifest` & viết Integration Tests
+- [x] Task 6 (`verifier`): Kiểm định toàn diện chất lượng, build production & kiểm tra danh mục nghiệm thu `SPEC.md`
 
 ### Checkpoint: Complete
-- [ ] Mọi tiêu chí nghiệm thu trong `SPEC.md` đạt 100%
-- [ ] Sẵn sàng mở qua Wi-Fi cho điện thoại sử dụng ngay
+- [x] Mọi tiêu chí nghiệm thu trong `SPEC.md` đạt 100%
+- [x] Sẵn sàng mở qua Wi-Fi cho điện thoại sử dụng ngay
 
 ## Risks and Mitigations
 
