@@ -1,0 +1,20 @@
+{
+  "name": "ShoopeeTool 11/11 — Trợ Lý Canh Nhịp Săn Mã",
+  "short_name": "ShoopeeTool",
+  "description": "Chuẩn bị kịch bản săn voucher, đồng hồ nổi chuẩn 0.1s và tối ưu tách đơn.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ee4d2d",
+  "background_color": "#0b1120",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

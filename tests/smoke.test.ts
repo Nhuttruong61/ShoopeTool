@@ -20,6 +20,7 @@ describe('Foundation smoke test', () => {
     expect(
       screen.getByRole('heading', {
         name: /ShoopeeTool 11\/11 — Trợ Lý Canh Nhịp Săn Mã/i,
+        level: 1,
       }),
     ).toBeInTheDocument();
   });
