@@ -9,8 +9,12 @@ export const STORAGE_KEYS = {
 export const DEFAULT_LEAD_MS = 300;
 export const DEFAULT_MANUAL_ADJUST_MS = 0;
 
+const VN_OFFSET_MS = 7 * 3600_000;
+const DAY_MS = 24 * 3600_000;
+
 /**
- * Computes the next upcoming epoch timestamp (ms) for a "HH:MM" slot time.
+ * Computes the next upcoming epoch timestamp (ms) for a "HH:MM" slot time in Vietnam timezone (UTC+7),
+ * keeping a 60s grace window after the slot opens.
  */
 export function resolveSlotTargetEpochMs(slotTime: string, nowEpochMs = Date.now()): number {
   const match = /^(\d{1,2}):(\d{2})$/.exec(slotTime.trim());
@@ -20,13 +24,15 @@ export function resolveSlotTargetEpochMs(slotTime: string, nowEpochMs = Date.now
   const hours = Math.min(23, Math.max(0, Number(match[1])));
   const minutes = Math.min(59, Math.max(0, Number(match[2])));
 
-  const target = new Date(nowEpochMs);
-  target.setHours(hours, minutes, 0, 0);
+  const refVnMs = nowEpochMs + VN_OFFSET_MS;
+  const startOfVnDayMs = Math.floor(refVnMs / DAY_MS) * DAY_MS;
+  const slotOffsetInDayMs = (hours * 60 + minutes) * 60_000;
 
-  if (target.getTime() <= nowEpochMs - 60_000) {
-    target.setDate(target.getDate() + 1);
+  let candidateVnMs = startOfVnDayMs + slotOffsetInDayMs;
+  if (candidateVnMs <= refVnMs - 60_000) {
+    candidateVnMs += DAY_MS;
   }
-  return target.getTime();
+  return candidateVnMs - VN_OFFSET_MS;
 }
 
 export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [

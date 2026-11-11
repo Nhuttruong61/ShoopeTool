@@ -13,6 +13,7 @@ import {
   loadLeadMs,
   loadManualAdjustMs,
   loadRunbookItems,
+  resolveSlotTargetEpochMs,
   saveLeadMs,
   saveManualAdjustMs,
   saveRunbookItems,
@@ -259,6 +260,27 @@ describe('storage.ts — Persistence & Corrupted JSON Recovery', () => {
 
     window.localStorage.setItem(STORAGE_KEYS.MANUAL_ADJUST_MS, 'invalid');
     expect(loadManualAdjustMs()).toBe(0);
+  });
+
+  it('computes resolveSlotTargetEpochMs in UTC+7 independently of device timezone (with 60s grace)', () => {
+    // 2026-11-10T22:00:00+07:00 is 2026-11-10T15:00:00.000Z
+    const now22hVn = Date.parse('2026-11-10T15:00:00.000Z');
+    // Next '00:00' VN is 2026-11-11T00:00:00+07:00 = 2026-11-10T17:00:00.000Z
+    expect(resolveSlotTargetEpochMs('00:00', now22hVn)).toBe(
+      Date.parse('2026-11-10T17:00:00.000Z'),
+    );
+
+    // Within 60s grace (30s after 00:00 VN = 2026-11-10T17:00:30.000Z), keeps same slot
+    const now00h00m30sVn = Date.parse('2026-11-10T17:00:30.000Z');
+    expect(resolveSlotTargetEpochMs('00:00', now00h00m30sVn)).toBe(
+      Date.parse('2026-11-10T17:00:00.000Z'),
+    );
+
+    // Past 60s grace (61s after 00:00 VN = 2026-11-10T17:01:01.000Z), rolls to next day 00:00 VN
+    const now00h01m01sVn = Date.parse('2026-11-10T17:01:01.000Z');
+    expect(resolveSlotTargetEpochMs('00:00', now00h01m01sVn)).toBe(
+      Date.parse('2026-11-11T17:00:00.000Z'),
+    );
   });
 });
 

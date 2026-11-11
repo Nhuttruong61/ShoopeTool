@@ -14,22 +14,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Cache-first for same-origin GET only; cross-origin (time APIs) is never intercepted.
+// Same-origin GET only; cross-origin (time APIs) is never intercepted.
+// Network-first for the shell (so redeploys are picked up), cache-first for hashed /assets/*.
+function putCache(req, res) {
+  if (res.ok) {
+    const copy = res.clone();
+    caches.open(CACHE).then((c) => c.put(req, copy));
+  }
+  return res;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => putCache(req, res))),
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        }),
-    ),
+    fetch(req)
+      .then((res) => putCache(req, res))
+      .catch(() => caches.match(req).then((hit) => hit || caches.match('/index.html'))),
   );
 });

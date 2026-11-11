@@ -108,7 +108,7 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
           {countdown.formattedClock}
         </div>
         <div className="countdown-row">
-          <span className="countdown-label">Đếm ngược chạm mốc (đã trừ bù tay):</span>
+          <span className="countdown-label">Còn lại đến mốc mở mã:</span>
           <span className="countdown-display tabular-nums" data-testid="live-countdown">
             {countdown.formattedRemaining}
           </span>
@@ -168,7 +168,7 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
       <div className="controls-grid">
         <div className="slider-card">
           <label className="slider-header" htmlFor="lead-ms-slider">
-            <span>Báo sớm bù phản xạ tay (0–1500ms, mặc định 300ms)</span>
+            <span>Báo sớm bù phản xạ tay (0–2000ms, mặc định 300ms)</span>
             <span className="slider-val tabular-nums">{countdown.leadMs}ms</span>
           </label>
           <input
@@ -176,7 +176,7 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
             type="range"
             className="range-input"
             min={0}
-            max={1500}
+            max={2000}
             step={50}
             value={countdown.leadMs}
             onChange={(e) => onLeadMsChange(Number(e.target.value))}
