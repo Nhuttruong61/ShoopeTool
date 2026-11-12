@@ -229,10 +229,10 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
       <section className="section-card" aria-label="Bóc Tách Nhanh Bài Đăng Mã Ký Tự Thật">
         <div className="section-header">
           <div>
-            <h2 className="section-title">📋 Bóc Tách Nhanh Bài Đăng Mã Ký Tự Thật (Smart Paste)</h2>
+            <h2 className="section-title">📋 Bóc Tách Nhanh Kèo Combo &amp; Mã Thật (Smart Paste)</h2>
             <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Copy tin nhắn phím mã từ Telegram / Zalo / Facebook 15 phút trước giờ mở mã rồi dán
-              vào đây — tự tách Mã + Giờ + Điều kiện!
+              Dán bài đăng combo <strong>[Link SP + Link/Mã Voucher]</strong> từ Telegram / Zalo /
+              Facebook trước giờ mở mã — tự tách Link SP, Link lưu mã, Mã ký tự &amp; Khung giờ!
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -263,14 +263,14 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
         )}
 
         <label className="field-label" htmlFor="smart-paste-textarea">
-          <span>Dán nội dung bài đăng mã giảm giá vào đây:</span>
+          <span>Dán nội dung bài đăng combo [Link SP + Link/Mã Voucher] vào đây:</span>
           <textarea
             id="smart-paste-textarea"
             data-testid="smart-paste-textarea"
             className="text-input"
             rows={4}
-            style={{ fontFamily: 'inherit', resize: 'vertical' }}
-            placeholder="VD: Khung 12h: Mã REAL12H50 giảm 50% tối đa 50K đơn từ 99K (ShopeePay)..."
+            style={{ fontFamily: 'inherit', height: 'auto', minHeight: '78px', resize: 'vertical' }}
+            placeholder="VD: 12:00: Săn Tai nghe giảm 50% combo [Link SP + Link/Mã Voucher] mã REAL12H50 mua SP: https://vn.shp.ee/... | Lưu mã: https://s.shopee.vn/... (ShopeePay)"
             value={pasteText}
             onChange={(e) => {
               setPasteText(e.target.value);
@@ -284,14 +284,28 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
         {parsedDeals.length > 0 ? (
           <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#6ee7b7' }}>
-              ✅ Bóc tách được {parsedDeals.length} mã ký tự:
+              ✅ Bóc tách được {parsedDeals.length} kèo / mã săn:
             </div>
             <div className="parsed-deals-list" data-testid="parsed-deals-preview">
               {parsedDeals.map((d) => (
                 <div key={d.id} className="parsed-deal-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span className="slot-pill">{d.slotTime}</span>
-                    <span className="voucher-code-pill">Mã: {d.voucherCode}</span>
+                    {d.voucherCode ? (
+                      <span className="voucher-code-pill">Mã: {d.voucherCode}</span>
+                    ) : (
+                      <span className="wallet-voucher-badge">🎟️ Kèo Link Trực Tiếp</span>
+                    )}
+                    {d.productUrl && (
+                      <span className="product-linked-badge" title={d.productUrl}>
+                        📦 Có Link SP
+                      </span>
+                    )}
+                    {d.voucherUrl && (
+                      <span className="dest-pill" title={d.voucherUrl}>
+                        🎟️ Có Link Mã
+                      </span>
+                    )}
                     <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                       TT: <strong>{d.paymentMethod}</strong>
                     </span>
@@ -309,14 +323,14 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
               data-testid="import-parsed-deals-btn"
               onClick={handleImportParsed}
             >
-              Đưa vào Kịch Bản Canh Giờ ({parsedDeals.length} mã)
+              Đưa vào Kịch Bản Canh Giờ ({parsedDeals.length} kèo)
             </button>
           </div>
         ) : (
           pasteText.trim() !== '' && (
             <p style={{ margin: '10px 0 0', fontSize: '0.84rem', color: '#fde68a' }}>
-              Chưa tìm thấy mã ký tự hợp lệ (chứa chữ + số như AFF1122, VIDEO50K) trong đoạn văn
-              bản trên.
+              Chưa tìm thấy mã ký tự hợp lệ (như AFF1122, VIDEO50K) hoặc combo [Link SP + Link
+              Voucher] trong đoạn văn bản trên.
             </p>
           )
         )}

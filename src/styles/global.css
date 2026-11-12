@@ -410,7 +410,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   background-color: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 7px;
@@ -421,10 +422,19 @@ body {
 .active-deal-left {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  gap: 5px;
+  flex: 1 1 160px;
   min-width: 0;
   overflow: hidden;
+}
+
+.active-deal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .active-deal-title {
@@ -1158,4 +1168,147 @@ body {
 .channel-eval-card.is-best-channel {
   border: 1.5px solid var(--accent-emerald);
   box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+}
+
+/* ==========================================================================
+   v2.1 Paired Product + Voucher Smart Inputs & Inline Card Attacher
+   ========================================================================== */
+
+.product-linked-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background-color: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.flash-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background-color: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.link-preview-badge {
+  display: block;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background-color: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  color: #6ee7b7;
+  font-size: 0.72rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strike-mode-pills {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+@media (min-width: 480px) {
+  .strike-mode-pills {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.strike-mode-pills-compact {
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.strike-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.strike-mode-pill:hover {
+  border-color: #64748b;
+  color: var(--text-primary);
+}
+
+.strike-mode-pill.active {
+  background-color: rgba(238, 77, 45, 0.2);
+  border-color: var(--accent-orange);
+  color: #fed7aa;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25);
+}
+
+.inline-attach-box {
+  background-color: rgba(10, 15, 29, 0.88);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.inline-attach-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+@media (min-width: 480px) {
+  .inline-attach-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.inline-attach-box .field-label,
+.inline-attach-box .text-input {
+  min-width: 0;
+  width: 100%;
+}
+
+.inline-attach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
 }

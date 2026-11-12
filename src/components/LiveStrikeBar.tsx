@@ -26,6 +26,8 @@ export interface LiveStrikeBarProps {
   onToggleAudio: () => void;
   onQuickCopyAndOpen?: (deal: DealRunbookItem) => void;
   onQuickOpenCart?: (deal: DealRunbookItem) => void;
+  onQuickOpenProduct?: (deal: DealRunbookItem) => void;
+  onQuickOpenVoucher?: (deal: DealRunbookItem) => void;
 }
 
 export const PHASE_LABELS: Record<TimePhase, string> = {
@@ -55,10 +57,14 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
   onToggleAudio,
   onQuickCopyAndOpen,
   onQuickOpenCart,
+  onQuickOpenProduct,
+  onQuickOpenVoucher,
 }) => {
   const [showTuning, setShowTuning] = useState(false);
   const phaseLabel = PHASE_LABELS[countdown.phase] ?? PHASE_LABELS.IDLE;
-  const activeDestHint = activeDeal ? getDestinationHint(activeDeal.shopeeUrl) : '';
+  const activeDestHint = activeDeal
+    ? getDestinationHint(activeDeal.voucherUrl || activeDeal.shopeeUrl)
+    : '';
 
   const containerClassName = [
     'strike-bar',
@@ -86,32 +92,87 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
           ) : (
             <span className="wallet-voucher-badge">Mã lưu trong Ví Shopee</span>
           )}
+          {activeDeal.productUrl && (
+            <span
+              className="product-linked-badge"
+              title={activeDeal.productUrl}
+            >
+              📦 Đã gán SP
+            </span>
+          )}
           {activeDestHint && (
-            <span className="dest-pill" title={activeDeal.shopeeUrl}>
+            <span
+              className="dest-pill"
+              title={activeDeal.voucherUrl || activeDeal.shopeeUrl}
+            >
               🎯 {activeDestHint}
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          {onQuickCopyAndOpen && (
-            <button
-              type="button"
-              className="btn btn-primary active-deal-open-btn"
-              onClick={() => onQuickCopyAndOpen(activeDeal)}
-            >
-              {activeDeal.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
-            </button>
-          )}
-          {onQuickOpenCart && activeDestHint !== 'Giỏ hàng' && (
-            <button
-              type="button"
-              className="btn btn-secondary active-deal-open-btn"
-              onClick={() => onQuickOpenCart(activeDeal)}
-              title="Mở thẳng Giỏ Hàng Shopee"
-            >
-              🛒
-            </button>
+        <div className="active-deal-actions">
+          {activeDeal.productUrl ? (
+            <>
+              {activeDeal.voucherUrl &&
+                (onQuickOpenVoucher || onQuickCopyAndOpen) && (
+                  <button
+                    type="button"
+                    data-testid="quick-open-voucher-btn"
+                    className="btn btn-outline-accent active-deal-open-btn"
+                    onClick={() =>
+                      (onQuickOpenVoucher ?? onQuickCopyAndOpen)?.(activeDeal)
+                    }
+                  >
+                    🎟️ Lưu Mã
+                  </button>
+                )}
+              {(onQuickOpenProduct || onQuickCopyAndOpen) && (
+                <button
+                  type="button"
+                  data-testid="quick-open-product-btn"
+                  className="btn btn-primary active-deal-open-btn"
+                  onClick={() =>
+                    (onQuickOpenProduct ?? onQuickCopyAndOpen)?.(activeDeal)
+                  }
+                >
+                  {activeDeal.voucherCode ? 'Copy Mã + Mở SP' : '📦 Mở SP Ngay'}
+                </button>
+              )}
+              {onQuickOpenCart && (
+                <button
+                  type="button"
+                  className="btn btn-secondary active-deal-open-btn"
+                  onClick={() => onQuickOpenCart(activeDeal)}
+                  title="Mở thẳng Giỏ Hàng Shopee"
+                >
+                  🛒
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {onQuickCopyAndOpen && (
+                <button
+                  type="button"
+                  className="btn btn-primary active-deal-open-btn"
+                  onClick={() => onQuickCopyAndOpen(activeDeal)}
+                >
+                  {activeDeal.voucherCode
+                    ? 'Copy Mã + Mở App Shopee'
+                    : 'Mở App Shopee'}
+                </button>
+              )}
+              {onQuickOpenCart && activeDestHint !== 'Giỏ hàng' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary active-deal-open-btn"
+                  onClick={() => onQuickOpenCart(activeDeal)}
+                  title="Mở thẳng Giỏ Hàng Shopee"
+                >
+                  🛒
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
