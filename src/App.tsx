@@ -2,7 +2,7 @@
 import { CartOptimizer } from './components/CartOptimizer';
 import { LiveStrikeBar } from './components/LiveStrikeBar';
 import { RunbookForm, type DealRunbookDraft } from './components/RunbookForm';
-import { RunbookList } from './components/RunbookList';
+import { RunbookList, type DealLinksPatch } from './components/RunbookList';
 import { VoucherMaxHub } from './components/VoucherMaxHub';
 import { AudioCueController } from './lib/audioCue';
 import {
@@ -257,7 +257,29 @@ export function App() {
   const handleCopyAndOpen = async (item: DealRunbookItem) => {
     const res = await copyAndLaunchShopee({
       voucherCode: item.voucherCode || undefined,
-      targetUrl: item.shopeeUrl,
+      targetUrl: item.productUrl || item.voucherUrl || item.shopeeUrl,
+      mode: openMode,
+    });
+    if (res.copied?.ok) {
+      setCopiedId(item.id);
+    }
+  };
+
+  const handleOpenProduct = async (item: DealRunbookItem) => {
+    const res = await copyAndLaunchShopee({
+      voucherCode: item.voucherCode || undefined,
+      targetUrl: item.productUrl || item.shopeeUrl || 'https://shopee.vn/cart',
+      mode: openMode,
+    });
+    if (res.copied?.ok) {
+      setCopiedId(item.id);
+    }
+  };
+
+  const handleOpenVoucher = async (item: DealRunbookItem) => {
+    const res = await copyAndLaunchShopee({
+      voucherCode: item.voucherCode || undefined,
+      targetUrl: item.voucherUrl || item.shopeeUrl || 'https://shopee.vn/m/ma-giam-gia',
       mode: openMode,
     });
     if (res.copied?.ok) {
@@ -273,6 +295,27 @@ export function App() {
     });
     if (res.copied?.ok) {
       setCopiedId(item.id);
+    }
+  };
+
+  const handleUpdateDealLinks = (id: string, patch: DealLinksPatch) => {
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        return {
+          ...i,
+          productUrl: 'productUrl' in patch ? patch.productUrl : i.productUrl,
+          voucherUrl: 'voucherUrl' in patch ? patch.voucherUrl : i.voucherUrl,
+          voucherCode: patch.voucherCode !== undefined ? patch.voucherCode : i.voucherCode,
+          strikeMode: patch.strikeMode !== undefined ? patch.strikeMode : i.strikeMode,
+          title: patch.title !== undefined ? patch.title : i.title,
+          itemsSummary: patch.itemsSummary !== undefined ? patch.itemsSummary : i.itemsSummary,
+          shopeeUrl: 'shopeeUrl' in patch ? patch.shopeeUrl : i.shopeeUrl,
+        };
+      }),
+    );
+    if (copiedId === id && patch.voucherCode !== undefined) {
+      setCopiedId(null);
     }
   };
 
@@ -302,6 +345,8 @@ export function App() {
       voucherNote: tip,
       paymentMethod: 'ShopeePay',
       shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
+      voucherUrl: 'https://shopee.vn/m/ma-giam-gia',
+      strikeMode: 'checkout-wait',
       checklist: emptyChecklist(),
       completed: false,
     };
@@ -321,7 +366,13 @@ export function App() {
       voucherCode: d.voucherCode,
       voucherNote: d.voucherNote,
       paymentMethod: d.paymentMethod,
-      shopeeUrl: 'https://shopee.vn/cart',
+      productUrl: d.productUrl,
+      voucherUrl: d.voucherUrl,
+      strikeMode: 'checkout-wait',
+      shopeeUrl:
+        d.productUrl ||
+        d.voucherUrl ||
+        (d.voucherCode ? 'https://shopee.vn/cart' : 'https://shopee.vn/m/ma-giam-gia'),
       checklist: emptyChecklist(),
       completed: false,
     }));
@@ -463,6 +514,8 @@ export function App() {
         onToggleAudio={handleToggleAudio}
         onQuickCopyAndOpen={(d) => void handleCopyAndOpen(d)}
         onQuickOpenCart={(d) => void handleOpenCart(d)}
+        onQuickOpenProduct={(d) => void handleOpenProduct(d)}
+        onQuickOpenVoucher={(d) => void handleOpenVoucher(d)}
       />
 
       <nav
@@ -494,6 +547,9 @@ export function App() {
           onCopyCode={(i) => void handleCopyCode(i)}
           onCopyAndOpenShopee={(i) => void handleCopyAndOpen(i)}
           onOpenCart={(i) => void handleOpenCart(i)}
+          onOpenProduct={(i) => void handleOpenProduct(i)}
+          onOpenVoucher={(i) => void handleOpenVoucher(i)}
+          onUpdateDealLinks={handleUpdateDealLinks}
           onToggleCompleted={handleToggleCompleted}
           onDelete={handleDelete}
         />
@@ -534,6 +590,12 @@ export function App() {
             <li>
               Thêm vào Màn hình chính (PWA): menu trình duyệt → “Thêm vào Màn hình chính” để mở
               toàn màn hình như app.
+            </li>
+            <li>
+              Ghép cặp <strong>[Link Sản Phẩm + Link Voucher]</strong> qua nút{' '}
+              <strong>🔗 Gán SP/Mã</strong> trên thẻ săn hoặc ô <strong>Smart Paste</strong>: tự
+              lọc sạch câu chia sẻ từ App Shopee để đúng giờ mở mã bấm 1 chạm nhảy thẳng vào đúng
+              trang Sản phẩm / Lưu mã trong App Shopee.
             </li>
             <li>Bấm “Bật đồng hồ nổi” (PiP) để đồng hồ nổi đè lên màn hình Shopee.</li>
             <li>

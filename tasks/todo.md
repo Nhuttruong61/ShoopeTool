@@ -203,15 +203,15 @@
 **Description:** Mở rộng hợp đồng kiểu tương thích ngược 100% cho mô hình cặp `[productUrl + voucherUrl + strikeMode]`, cài đặt bộ lọc văn bản chia sẻ Shopee App (`extractShopeeLinkInfo`), xử lý điều hướng Universal Link / Android App Link cho shortlink (`vn.shp.ee`, `s.shopee.vn`) không bị lạc về `/cart`, và lưu trữ bền vững trong `localStorage`.
 
 **Acceptance criteria:**
-- [ ] `src/types/contracts.ts` bổ sung `StrikeMode` (`'checkout-wait' | 'flash-product'`), `ShopeeLinkKind`, `ExtractedShopeeLink`, mở rộng tùy chọn `productUrl`, `voucherUrl`, `strikeMode` trên `DealRunbookItem` và `productUrl`, `voucherUrl` trên `ParsedDealCandidate`.
-- [ ] `src/lib/clipboard.ts` cài đặt `extractShopeeLinkInfo(rawInput)` tách sạch `cleanUrl` (cắt dấu câu thừa cuối link), tự động trích xuất `extractedTitle` từ câu rao Shopee App hoặc slug `-i.{shopId}.{itemId}`, lấy `shopId`/`itemId` và phân loại đúng `ShopeeLinkKind`.
-- [ ] `buildShopeeLaunchTargets` lọc `cleanUrl` từ chuỗi share-text trước khi parse để không bao giờ bị fallback nhầm về `/cart`; `copyAndLaunchShopee` mở shortlink trực tiếp qua OS Universal Link / App Link ở `auto-app` trên Android/iOS và qua `intent://...#Intent;scheme=https;package=com.shopee.vn...` ở `force-app` trên Android, giữ tương thích 100% với `tests/deeplink.test.ts`.
-- [ ] `src/lib/storage.ts` bảo toàn `productUrl`, `voucherUrl`, `strikeMode` khi đọc/ghi `localStorage` và tự ánh xạ `shopeeUrl` (khác `/cart`) sang `voucherUrl` cho dữ liệu cũ chưa có `voucherUrl`.
-- [ ] `tests/productVoucherLinks.test.ts` bao phủ đầy đủ Share-Text extraction, phân loại link, điều hướng shortlink trên Android/iOS/Desktop và round-trip `storage.ts`.
+- [x] `src/types/contracts.ts` bổ sung `StrikeMode` (`'checkout-wait' | 'flash-product'`), `ShopeeLinkKind`, `ExtractedShopeeLink`, mở rộng tùy chọn `productUrl`, `voucherUrl`, `strikeMode` trên `DealRunbookItem` và `productUrl`, `voucherUrl` trên `ParsedDealCandidate`.
+- [x] `src/lib/clipboard.ts` cài đặt `extractShopeeLinkInfo(rawInput)` tách sạch `cleanUrl` (cắt dấu câu thừa cuối link), tự động trích xuất `extractedTitle` từ câu rao Shopee App hoặc slug `-i.{shopId}.{itemId}`, lấy `shopId`/`itemId` và phân loại đúng `ShopeeLinkKind`.
+- [x] `buildShopeeLaunchTargets` lọc `cleanUrl` từ chuỗi share-text trước khi parse để không bao giờ bị fallback nhầm về `/cart`; `copyAndLaunchShopee` mở shortlink trực tiếp qua OS Universal Link / App Link ở `auto-app` trên Android/iOS và qua `intent://...#Intent;scheme=https;package=com.shopee.vn...` ở `force-app` trên Android, giữ tương thích 100% với `tests/deeplink.test.ts`.
+- [x] `src/lib/storage.ts` bảo toàn `productUrl`, `voucherUrl`, `strikeMode` khi đọc/ghi `localStorage` và tự ánh xạ `shopeeUrl` (khác `/cart`) sang `voucherUrl` cho dữ liệu cũ chưa có `voucherUrl`.
+- [x] `tests/productVoucherLinks.test.ts` bao phủ đầy đủ Share-Text extraction, phân loại link, điều hướng shortlink trên Android/iOS/Desktop và round-trip `storage.ts`.
 
 **Verification:**
-- [ ] Tests pass: `npx vitest run tests/deeplink.test.ts tests/productVoucherLinks.test.ts`
-- [ ] Build succeeds: `npm test && npm run build`
+- [x] Tests pass: `npx vitest run tests/deeplink.test.ts tests/productVoucherLinks.test.ts`
+- [x] Build succeeds: `npm test && npm run build`
 
 **Dependencies:** Phase v2.0
 
@@ -244,8 +244,8 @@
 ---
 
 ### Checkpoint: After Wave 1 (`contracts-links` + `plan-architect`)
-- [ ] Hợp đồng kiểu v2.1 và hàm `extractShopeeLinkInfo` + Universal Link launcher đã merge sạch, pass 100% unit tests (`deeplink.test.ts` & `productVoucherLinks.test.ts`).
-- [ ] Tài liệu đặc tả `SPEC.md` và kế hoạch điều phối Swarm v2.1 đã sẵn sàng làm chuẩn tham chiếu cho Wave 2–4.
+- [x] Hợp đồng kiểu v2.1 và hàm `extractShopeeLinkInfo` + Universal Link launcher đã merge sạch, pass 100% unit tests (`deeplink.test.ts` & `productVoucherLinks.test.ts`).
+- [x] Tài liệu đặc tả `SPEC.md` và kế hoạch điều phối Swarm v2.1 đã sẵn sàng làm chuẩn tham chiếu cho Wave 2–4.
 
 ---
 
@@ -254,13 +254,13 @@
 **Description:** Nâng cấp bộ phân tích tin nhắn deal trong `src/lib/yearRoundDeals.ts` để tự động nhận diện, phân loại và ghép cặp cả `productUrl` (link sản phẩm / shortlink SP kèm tên món) lẫn `voucherUrl` (link lưu mã / trạm voucher) cùng `voucherCode` từ văn bản copy trên Zalo / Telegram / Facebook.
 
 **Acceptance criteria:**
-- [ ] `parseDealTextPaste(rawText)` sử dụng `extractShopeeLinkInfo` để bóc tách chính xác `productUrl` và `voucherUrl` trên từng dòng hoặc cụm dòng deal liên tiếp trong cùng khung giờ, đồng thời tận dụng `extractedTitle` làm tên món dễ hiểu khi có văn bản chia sẻ SP.
-- [ ] Cập nhật `SAMPLE_DEAL_PASTE_TEXT` minh họa rõ kịch bản thực tế có đính kèm cặp link sản phẩm rút gọn + link lưu voucher + mã ký tự mà không phá vỡ các test hiện hữu.
-- [ ] Mở rộng `tests/yearRoundDeals.test.ts` kiểm thử đầy đủ các ca dán combo `[Link SP + Link Voucher + Mã]`, chỉ có Link SP, chỉ có Link Voucher, và nhiều link trong cùng bản tin.
+- [x] `parseDealTextPaste(rawText)` sử dụng `extractShopeeLinkInfo` để bóc tách chính xác `productUrl` và `voucherUrl` trên từng dòng hoặc cụm dòng deal liên tiếp trong cùng khung giờ, đồng thời tận dụng `extractedTitle` làm tên món dễ hiểu khi có văn bản chia sẻ SP.
+- [x] Bảo toàn 100% tương thích ngược cho `SAMPLE_DEAL_PASTE_TEXT` và hỗ trợ thêm cả kèo link trực tiếp (`voucherCode: ''`) lẫn cặp link SP rút gọn + link lưu voucher + mã ký tự mà không nhận nhầm slug URL hay thông số `100W`/`256GB` thành mã.
+- [x] Mở rộng `tests/yearRoundDeals.test.ts` kiểm thử đầy đủ các ca dán combo `[Link SP + Link Voucher + Mã]`, chỉ có Link SP, chỉ có Link Voucher, và nhiều link trong cùng bản tin.
 
 **Verification:**
-- [ ] Tests pass: `npx vitest run tests/yearRoundDeals.test.ts`
-- [ ] Build succeeds: `npm run typecheck`
+- [x] Tests pass: `npx vitest run tests/yearRoundDeals.test.ts`
+- [x] Build succeeds: `npm run typecheck`
 
 **Dependencies:** Task 9 (`contracts-links`)
 
@@ -275,15 +275,15 @@
 **Description:** Nâng cấp các React components sang trải nghiệm Ghép Cặp `[SP + Voucher]` 1-chạm trên di động: tự lọc câu rao Shopee App khi dán link vào form, hỗ trợ đính/sửa nhanh link ngay trên thẻ Runbook hiện có, chọn chế độ `strikeMode`, và hiển thị cụm nút `🎟️ Lưu Mã` + `📦 Mở SP` + `🛒 Giỏ hàng` trên cả thẻ Runbook, `LiveStrikeBar` và `VoucherMaxHub`.
 
 **Acceptance criteria:**
-- [ ] `RunbookForm.tsx` có ô nhập `productUrl` (dán nguyên câu chia sẻ Shopee App tự lọc URL sạch & tự điền tên món nếu đang trống), ô `voucherUrl` (kèm gợi ý chọn nhanh Hub lưu mã) và nút chọn `strikeMode` (`checkout-wait` vs `flash-product`).
-- [ ] `RunbookList.tsx` hiển thị rõ trạng thái cặp link + huy hiệu `strikeMode` trên từng thẻ, tích hợp cụm nút hành động 1-chạm (`🎟️ Lưu Mã`, `📦 Mở SP`, `🛒 Giỏ hàng` — tự động copy `voucherCode` trước khi mở Shopee), và cho phép bấm **Đính/Sửa Link** ngay trên thẻ (inline attachment/editor) không cần xóa tạo lại.
-- [ ] `LiveStrikeBar.tsx` hiển thị thanh hành động 1-chạm tương ứng với cặp `productUrl` / `voucherUrl` và `strikeMode` của ca săn đang chọn ngay dưới/cạnh đồng hồ `0.1s`.
-- [ ] `VoucherMaxHub.tsx` hiển thị preview các tag `[📦 Có Link SP]` / `[🎟️ Có Link Mã]` cho kết quả Smart Paste combo và cho phép mở thử hoặc nạp trọn bộ cặp link vào Runbook.
-- [ ] `src/styles/global.css` đảm bảo bố cục gọn gàng trên màn hình hẹp `360px`, tương phản rõ và vùng chạm cảm ứng chuẩn mobile.
+- [x] `RunbookForm.tsx` có ô nhập `productUrl` (dán nguyên câu chia sẻ Shopee App tự lọc URL sạch & tự điền tên món nếu đang trống), ô `voucherUrl` (kèm gợi ý chọn nhanh Hub lưu mã) và nút chọn `strikeMode` (`checkout-wait` vs `flash-product`).
+- [x] `RunbookList.tsx` hiển thị rõ trạng thái cặp link + huy hiệu `strikeMode` trên từng thẻ, tích hợp cụm nút hành động 1-chạm (`🎟️ Lưu Mã`, `📦 Mua SP Ngay` / `Copy Mã + Mở SP`, `🛒 Giỏ hàng` — tự động copy `voucherCode` trước khi mở Shopee), và cho phép bấm **🔗 Gán SP/Mã** ngay trên thẻ (inline attachment/editor) không cần xóa tạo lại.
+- [x] `LiveStrikeBar.tsx` hiển thị thanh hành động 1-chạm tương ứng với cặp `productUrl` / `voucherUrl` của ca săn đang chọn ngay dưới/cạnh đồng hồ `0.1s`.
+- [x] `VoucherMaxHub.tsx` hiển thị preview các tag `[📦 Có Link SP]` / `[🎟️ Có Link Mã]` cho kết quả Smart Paste combo và cho phép nạp trọn bộ cặp link vào Runbook.
+- [x] `src/styles/global.css` đảm bảo bố cục gọn gàng trên màn hình hẹp `360px`, tương phản rõ và vùng chạm cảm ứng chuẩn mobile.
 
 **Verification:**
-- [ ] Build succeeds: `npm run typecheck && npm run build`
-- [ ] Manual check: Kiểm tra hiển thị và tương tác trên kích thước mobile `360x800` & `375x812`.
+- [x] Build succeeds: `npm run typecheck && npm run build`
+- [x] Manual check: Kiểm tra hiển thị và tương tác trên kích thước mobile `360x800` & `375x812`.
 
 **Dependencies:** Task 9 (`contracts-links`)
 
@@ -297,30 +297,33 @@
 ---
 
 ### Checkpoint: After Wave 2 (`combo-parser` + `pair-ui`)
-- [ ] Engine Smart Paste combo pass 100% unit tests trong `tests/yearRoundDeals.test.ts`.
-- [ ] Toàn bộ UI components mới biên dịch sạch kiểu (`tsc -b`), không xung đột file giữa `combo-parser` và `pair-ui`.
+- [x] Engine Smart Paste combo pass 100% unit tests trong `tests/yearRoundDeals.test.ts`.
+- [x] Toàn bộ UI components mới biên dịch sạch kiểu (`tsc -b`), không xung đột file giữa `combo-parser` và `pair-ui`.
 
 ---
 
-### Task 13 (`integrator` — Wave 3): Tích Hợp Toàn Luồng `App.tsx` & Kiểm Thử Tích Hợp v2.1
+### Task 13 (`integrator` — Wave 3): Tích Hợp Toàn Luồng `App.tsx`, SW v4 & Kiểm Thử Tích Hợp v2.1
 
-**Description:** Hợp nhất kết quả của Wave 1 & Wave 2 vào `src/App.tsx`, kết nối state cập nhật inline cặp link/`strikeMode` trên thẻ Runbook, truyền trọn vẹn `productUrl` + `voucherUrl` từ Smart Paste sang danh sách kịch bản săn mã, và bổ sung integration tests kiểm chứng toàn bộ luồng người dùng v2.1.
+**Description:** Hợp nhất kết quả của Wave 1 & Wave 2 vào `src/App.tsx`, nâng cache Service Worker lên `shoopeetool-shell-v4`, kết nối state cập nhật inline cặp link/`strikeMode` trên thẻ Runbook, truyền trọn vẹn `productUrl` + `voucherUrl` từ Smart Paste sang danh sách kịch bản săn mã, cập nhật hướng dẫn sử dụng và bổ sung E2E integration tests tại `tests/v21-pair-links.test.tsx`.
 
 **Acceptance criteria:**
-- [ ] `src/App.tsx` kết nối đầy đủ handler cập nhật inline (`productUrl`, `voucherUrl`, `strikeMode`, `title`) cho từng `DealRunbookItem`, đồng bộ tức thì xuống `localStorage` và `LiveStrikeBar`.
-- [ ] Khi nạp deal từ Smart Paste trong `VoucherMaxHub`, các trường `productUrl` và `voucherUrl` được bảo toàn vào `DealRunbookItem` mới (và tự suy luận `strikeMode` hợp lý hoặc giữ mặc định chuẩn).
-- [ ] Mở rộng `tests/storage-ui.test.tsx` và `tests/v2-max-voucher.test.tsx` kiểm tra: dán chuỗi chia sẻ Shopee App tự lọc URL + tên món, đính link inline trên thẻ có sẵn, lưu `localStorage` bền vững, nạp combo từ Smart Paste, và bấm các nút `🎟️ Lưu Mã` / `📦 Mở SP` / `🛒 Giỏ hàng`.
+- [x] `src/App.tsx` kết nối đầy đủ `handleOpenProduct`, `handleOpenVoucher`, `handleUpdateDealLinks` và ưu tiên `productUrl || voucherUrl || shopeeUrl` trong `handleCopyAndOpen`, đồng bộ tức thì xuống `localStorage`, `LiveStrikeBar` và cửa sổ PiP.
+- [x] Khi nạp deal từ Smart Paste trong `VoucherMaxHub`, các trường `productUrl`, `voucherUrl` và `shopeeUrl` được bảo toàn trọn vẹn vào `DealRunbookItem` mới.
+- [x] Nâng `CACHE` trong `public/sw.js` lên `'shoopeetool-shell-v4'`, cập nhật hướng dẫn trên tab `Hướng dẫn ĐT` và `README.md`.
+- [x] `tests/v21-pair-links.test.tsx` kiểm tra toàn luồng E2E: tạo deal ghép cặp từ câu chia sẻ Shopee App trong `RunbookForm`, gán link inline qua `toggle-attach-${id}` cập nhật `RunbookList` + `LiveStrikeBar` + `localStorage`, và nạp bài đăng combo từ `VoucherMaxHub` Smart Paste mở đúng từng link (không bao giờ lạc về `/cart`).
 
 **Verification:**
-- [ ] Tests pass: `npm test`
-- [ ] Build succeeds: `npm run typecheck && npm run build`
+- [x] Tests pass: `npm test`
+- [x] Build succeeds: `npm run typecheck && npm run build`
 
 **Dependencies:** Task 10, Task 11, Task 12
 
 **Files owned:**
 - `src/App.tsx`
-- `tests/storage-ui.test.tsx`
-- `tests/v2-max-voucher.test.tsx`
+- `public/sw.js`
+- `README.md`
+- `tasks/todo.md`
+- `tests/v21-pair-links.test.tsx`
 
 ---
 
