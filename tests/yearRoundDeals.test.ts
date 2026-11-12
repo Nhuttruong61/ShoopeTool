@@ -161,6 +161,171 @@ describe('parseDealTextPaste (Smart Paste Deal Parser for Zalo/Telegram/FB)', ()
     expect(parseDealTextPaste('')).toEqual([]);
     expect(parseDealTextPaste('   \n  🔥 KHUNG 0H: \n  Chúc các bạn ngủ ngon! ')).toEqual([]);
   });
+
+  it('parses single-line paired combos [productUrl + voucherUrl + voucherCode] in any label order', () => {
+    const singleLine =
+      '12:00: Săn Tai nghe Sony giảm 50% mã AFFSONY50 mua SP: https://vn.shp.ee/Sp123 | Lưu mã: https://s.shopee.vn/Vc456 (ShopeePay)';
+
+    const parsed = parseDealTextPaste(singleLine);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      slotTime: '12:00',
+      voucherCode: 'AFFSONY50',
+      productUrl: 'https://vn.shp.ee/Sp123',
+      voucherUrl: 'https://s.shopee.vn/Vc456',
+      paymentMethod: 'ShopeePay',
+    });
+    expect(parsed[0].title).toContain('AFFSONY50');
+    expect(parsed[0].title).toContain('Tai nghe Sony');
+
+    // Reversed URL order (voucher link first, product link second) + unlabeled second URL fallback
+    const reversedAndUnlabeled = `
+      09:00: Lưu mã trước: https://s.shopee.vn/Claim9H | Mua SP Bàn phím cơ mã KEY9H50: https://vn.shp.ee/Key999
+      15:00: Chuột Logitech giảm 30% mã LOGI30K https://vn.shp.ee/LogiSp1 https://s.shopee.vn/LogiVc2
+    `;
+    const multiSingle = parseDealTextPaste(reversedAndUnlabeled);
+    expect(multiSingle).toHaveLength(2);
+    expect(multiSingle[0]).toMatchObject({
+      slotTime: '09:00',
+      voucherCode: 'KEY9H50',
+      productUrl: 'https://vn.shp.ee/Key999',
+      voucherUrl: 'https://s.shopee.vn/Claim9H',
+    });
+    expect(multiSingle[1]).toMatchObject({
+      slotTime: '15:00',
+      voucherCode: 'LOGI30K',
+      productUrl: 'https://vn.shp.ee/LogiSp1',
+      voucherUrl: 'https://s.shopee.vn/LogiVc2',
+    });
+  });
+
+  it('merges multi-line grouped combo blocks and continuation link lines onto a single ParsedDealCandidate', () => {
+    const multiLineBlock = `
+🔥 12h: Tai nghe Bluetooth ANC giảm 50%
+- Mã: AFFSONY50 (đơn từ 200K, ShopeePay)
+- Link SP: https://vn.shp.ee/Sp123
+- Link lưu mã: https://s.shopee.vn/Vc456
+
+⏰ 18h: Sạc dự phòng Anker 20000mAh
+- Link SP: https://vn.shp.ee/AnkerSp88
+- Mã: ANKER18H (SPayLater)
+👉 https://shopee.vn/m/voucher-xtra
+    `;
+
+    const parsed = parseDealTextPaste(multiLineBlock);
+    expect(parsed).toHaveLength(2);
+
+    expect(parsed[0]).toMatchObject({
+      slotTime: '12:00',
+      voucherCode: 'AFFSONY50',
+      productUrl: 'https://vn.shp.ee/Sp123',
+      voucherUrl: 'https://s.shopee.vn/Vc456',
+      paymentMethod: 'ShopeePay',
+    });
+    expect(parsed[0].title).toContain('Tai nghe Bluetooth ANC');
+    expect(parsed[0].voucherNote).toContain('200K');
+
+    expect(parsed[1]).toMatchObject({
+      slotTime: '18:00',
+      voucherCode: 'ANKER18H',
+      productUrl: 'https://vn.shp.ee/AnkerSp88',
+      voucherUrl: 'https://shopee.vn/m/voucher-xtra',
+      paymentMethod: 'SPayLater',
+    });
+    expect(parsed[1].title).toContain('Sạc dự phòng Anker');
+  });
+
+  it('supports link-only deals (voucherCode = "") with clear title & voucherNote and keeps distinct link-only bullets separate', () => {
+    const linkOnlyPost = `
+⏰ 21:00: Deal 1K Cáp sạc nhanh 100W https://vn.shp.ee/Deal1K99 — Lưu voucher tại https://shopee.vn/m/voucher-xtra
+
+🔥 KHUNG 0H:
+- Deal 9K Chuột không dây Silent https://vn.shp.ee/Mouse9K
+- Mua ngay Tai nghe Sony WF-1000XM5 với giá chỉ ₫3.990.000! Mua ngay trên Shopee! https://vn.shp.ee/AbCd12
+- https://shopee.vn/Ban-phim-co-RGB-i.12345.67890
+- Lưu sớm kho mã toàn sàn: https://shopee.vn/m/ma-giam-gia
+    `;
+
+    const parsed = parseDealTextPaste(linkOnlyPost);
+    expect(parsed).toHaveLength(5);
+
+    // 1. Paired link-only deal (100W & Deal1K99 must NOT be misread as voucherCode)
+    expect(parsed[0]).toMatchObject({
+      slotTime: '21:00',
+      voucherCode: '',
+      productUrl: 'https://vn.shp.ee/Deal1K99',
+      voucherUrl: 'https://shopee.vn/m/voucher-xtra',
+    });
+    expect(parsed[0].title).toContain('Deal 1K Cáp sạc nhanh 100W');
+    expect(parsed[0].voucherNote.length).toBeGreaterThan(5);
+
+    // 2. Product shortlink-only deal #1
+    expect(parsed[1]).toMatchObject({
+      slotTime: '00:00',
+      voucherCode: '',
+      productUrl: 'https://vn.shp.ee/Mouse9K',
+    });
+    expect(parsed[1].voucherUrl).toBeUndefined();
+    expect(parsed[1].title).toContain('Deal 9K Chuột không dây Silent');
+
+    // 3. Shopee App share text link-only deal (WF-1000XM5 & AbCd12 NOT misread as voucherCode)
+    expect(parsed[2]).toMatchObject({
+      slotTime: '00:00',
+      voucherCode: '',
+      productUrl: 'https://vn.shp.ee/AbCd12',
+      title: 'Tai nghe Sony WF-1000XM5',
+    });
+
+    // 4. Bare product slug URL (-i.12345.67890 humanized title, NOT misread as voucherCode)
+    expect(parsed[3]).toMatchObject({
+      slotTime: '00:00',
+      voucherCode: '',
+      productUrl: 'https://shopee.vn/Ban-phim-co-RGB-i.12345.67890',
+      title: 'Ban phim co RGB',
+    });
+
+    // 5. Voucher-hub-only deal
+    expect(parsed[4]).toMatchObject({
+      slotTime: '00:00',
+      voucherCode: '',
+      voucherUrl: 'https://shopee.vn/m/ma-giam-gia',
+    });
+    expect(parsed[4].productUrl).toBeUndefined();
+
+    // 6. Multi-line link-only block (headline + Link SP + Link mã without text voucherCode)
+    const multiLineLinkOnly = `
+🔥 09h: Nồi chiên không dầu Lock&Lock 5L giảm sâu
+- Link SP: https://vn.shp.ee/Lock5L
+- Link mã: https://s.shopee.vn/LockVc9H
+    `;
+    const parsedMultiLink = parseDealTextPaste(multiLineLinkOnly);
+    expect(parsedMultiLink).toHaveLength(1);
+    expect(parsedMultiLink[0]).toMatchObject({
+      slotTime: '09:00',
+      voucherCode: '',
+      productUrl: 'https://vn.shp.ee/Lock5L',
+      voucherUrl: 'https://s.shopee.vn/LockVc9H',
+    });
+    expect(parsedMultiLink[0].title).toContain('Nồi chiên không dầu Lock&Lock');
+  });
+
+  it('never mistakes shortlink slugs, shopeevn:// schemes, or product IDs for alphanumeric voucherCode tokens', () => {
+    const trickyUrls = `
+      09:00: Săn deal hot https://vn.shp.ee/AbCd12 | Claim voucher https://s.shopee.vn/9zXy88
+      12:00: Mở app shopeevn://home?navigate_url=https%3A%2F%2Fshopee.vn%2Fproduct%2F12345%2F67890
+      15:00: Link SP https://shopee.vn/Tai-nghe-i.123.456?sp_atk=Zz99Xx88
+    `;
+
+    const parsed = parseDealTextPaste(trickyUrls);
+    expect(parsed).toHaveLength(3);
+    for (const item of parsed) {
+      expect(item.voucherCode).toBe('');
+    }
+    expect(parsed[0].productUrl).toBe('https://vn.shp.ee/AbCd12');
+    expect(parsed[0].voucherUrl).toBe('https://s.shopee.vn/9zXy88');
+    expect(parsed[1].productUrl).toContain('shopeevn://');
+    expect(parsed[2].productUrl).toBe('https://shopee.vn/Tai-nghe-i.123.456?sp_atk=Zz99Xx88');
+  });
 });
 
 describe('compareChannelStacks (3-Layer Stack & Normal vs Video vs Live Calculator)', () => {

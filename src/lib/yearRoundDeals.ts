@@ -8,6 +8,7 @@ import type {
   ShoppingChannel,
   VoucherHubShortcut,
 } from '../types/contracts';
+import { extractShopeeLinkInfo } from './clipboard';
 import { formatVnd } from './optimizer';
 
 const VN_OFFSET_MS = 7 * 3600_000;
@@ -260,12 +261,50 @@ const CODE_STOPWORDS = new Set([
   'THANG',
 ]);
 
+const RAW_URL_TOKEN_RE =
+  /(?:https?:\/\/|shopeevn:\/\/)[^\s"'<>]+|(?<![\w/:.])(?:(?:vn\.)?shp\.ee|s\.shopee\.vn|shope\.ee|shopee\.vn)\/[^\s"'<>]+/gi;
+
+const LABELED_URL_CLAUSE_RE =
+  /(?:\s*[|—–;,-]\s*|\s+)(?:(?:link|đường\s*dẫn)\s*(?:lưu\s*|mua\s*|săn\s*)?(?:sp|sản\s*phẩm|mua(?:\s*hàng)?|deal|mã(?:\s*giảm(?:\s*giá)?)?|voucher|kho\s*mã)|lưu\s*(?:sớm\s*)?(?:mã|voucher)(?:\s*tại)?|mua\s*(?:sp|sản\s*phẩm|ngay)(?:\s*tại)?|kho\s*(?:mã|voucher)|claim(?:\s*(?:mã|voucher))?(?:\s*tại)?|voucher\s*tại)\s*[:=-]?\s*(?:(?:https?:\/\/|shopeevn:\/\/)[^\s"'<>]+|(?<![\w/:.])(?:(?:vn\.)?shp\.ee|s\.shopee\.vn|shope\.ee|shopee\.vn)\/[^\s"'<>]+)/giu;
+
+const IMMEDIATE_PRODUCT_LABEL_RE =
+  /(?:(?:link|đường\s*dẫn)\s*(?:sp|sản\s*phẩm|mua(?:\s*hàng)?|deal)|mua\s*(?:sp|sản\s*phẩm|ngay)(?:\s*tại)?|(?:^|[\s\-*•👉▶️📌📦🛒:(])(?:sản\s*phẩm|sp))\s*[:=-]?\s*(?:tại\s*)?$/iu;
+
+const STRONG_VOUCHER_LABEL_RE =
+  /(?:(?:link|đường\s*dẫn)\s*(?:lưu\s*)?(?:mã|voucher)|lưu\s*(?:sớm\s*)?(?:mã|voucher)|kho\s*(?:mã|voucher)|claim(?:\s*(?:mã|voucher))?|lấy\s*(?:mã|voucher)|nhận\s*(?:mã|voucher)|vào\s*ví\s*voucher)/iu;
+
+const CLAUSE_VOUCHER_LABEL_RE =
+  /^(?:[\s\-*•🔥⏰📌⚡👉▶️🎟️🔗]+)?(?:(?:[01]?\d|2[0-3])\s*(?::[0-5]\d|[hgHG](?:[0-5]\d)?)\s*[:\-–—]?\s*)?(?:voucher|mã\s*giảm(?:\s*giá)?)(?:\s+[\p{L}\p{N}%]+){0,3}\s*(?:tại|ở)?\s*[:=-]?\s*$/iu;
+
+const TAIL_VOUCHER_LABEL_RE =
+  /(?:voucher|mã\s*giảm(?:\s*giá)?)\s*(?:tại(?:\s*đây)?|ở\s*đây)?\s*[:=-]?\s*$/iu;
+
+const GENERAL_PRODUCT_CUE_RE = /\b(?:link\s*sp|link\s*mua|sản\s*phẩm|mua\s*ngay|deal)\b/iu;
+
+const CONTINUATION_LABEL_PIECE_RE =
+  /^(?:(?:link|đường\s*dẫn)\s*(?:lưu\s*|mua\s*|săn\s*)?(?:sp|sản\s*phẩm|hàng|deal|mã(?:\s*giảm(?:\s*giá)?)?|voucher|kho\s*mã)?|(?:lưu|lấy|nhận|săn|claim)\s*(?:sớm\s*)?(?:mã(?:\s*giảm(?:\s*giá)?)?|voucher)?|(?:mua|xem|đặt)\s*(?:ngay|sp|sản\s*phẩm|hàng|deal)?|sp|sản\s*phẩm|kho\s*(?:mã|voucher)|voucher(?:\s*xtra|\s*shopee|\s*live|\s*video)?|mã\s*giảm(?:\s*giá)?)(?:\s*(?:tại(?:\s*đây)?|ở\s*đây|ngay|nhé))?$/iu;
+
+interface ClassifiedDealUrl {
+  cleanUrl: string;
+  role: 'product' | 'voucher';
+  explicit: boolean;
+  extractedTitle: string | null;
+}
+
+function stripUrlsFromText(text: string): string {
+  return text
+    .replace(RAW_URL_TOKEN_RE, ' ')
+    .replace(/\(\s*\)|\[\s*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
- * Extracts a normalized "HH:MM" slot time from a line if present.
+ * Extracts a normalized "HH:MM" slot time from a line (after stripping URLs) if present.
  */
-function extractSlotTimeFromText(line: string): string | null {
+function extractSlotTimeFromText(lineWithoutUrls: string): string | null {
   // 1. Check explicit HH:MM format (e.g. 00:00, 9:00, 12:30, 21:00)
-  const colonMatch = /(?:^|[^\d])([01]?\d|2[0-3]):([0-5]\d)(?!\d)/.exec(line);
+  const colonMatch = /(?:^|[^\d])([01]?\d|2[0-3]):([0-5]\d)(?!\d)/.exec(lineWithoutUrls);
   if (colonMatch) {
     const h = Number(colonMatch[1]);
     const m = Number(colonMatch[2]);
@@ -274,7 +313,7 @@ function extractSlotTimeFromText(line: string): string | null {
 
   // 2. Check Vietnamese hour shorthand (e.g. "KHUNG 0H", "12h:", "9h30", "21g")
   const hourMatch = /(?:^|[^\p{L}\d])([01]?\d|2[0-3])\s*[hgHG](?:([0-5]\d))?(?=$|[^\p{L}\d])/u.exec(
-    line,
+    lineWithoutUrls,
   );
   if (hourMatch) {
     const h = Number(hourMatch[1]);
@@ -286,8 +325,9 @@ function extractSlotTimeFromText(line: string): string | null {
 }
 
 /**
- * Checks whether an uppercase ASCII token is a price/amount token (e.g., 100K, 250K, 0D, 50TR)
- * or a time token (e.g., 0H, 12H, 12H30, 21G) rather than a voucher code.
+ * Checks whether an uppercase ASCII token is a price/amount token (e.g., 100K, 250K, 0D, 50TR),
+ * a time token (e.g., 0H, 12H, 12H30, 21G), or a hardware/volume spec token (e.g., 100W, 256GB, 500ML)
+ * rather than a voucher code.
  */
 function isPriceOrTimeToken(upperToken: string): boolean {
   // Price tokens: 100K, 250K, 50D, 500VND, 1TR, etc.
@@ -298,6 +338,15 @@ function isPriceOrTimeToken(upperToken: string): boolean {
   if (/^(?:[01]?\d|2[0-3])[HG](?:[0-5]\d)?(?:P)?$/i.test(upperToken)) {
     return true;
   }
+  // Product spec / measurement unit tokens: 100W, 65W, 20000MAH, 256GB, 500ML, 144HZ, 1080P, etc.
+  if (
+    /^\d+(?:W|KW|MW|MAH|AH|WH|V|KV|A|MA|HZ|KHZ|MHZ|GHZ|GB|TB|MB|KB|ML|L|CL|KG|GR|MG|CM|MM|M|KM|INCH|MP|FPS|DPI|PCS|OZ)$/i.test(
+      upperToken,
+    ) ||
+    /^(?:480|720|1080|1440|2160)P$/i.test(upperToken)
+  ) {
+    return true;
+  }
   // Pure digits: 100, 250, 2026
   if (/^\d+$/.test(upperToken)) {
     return true;
@@ -306,49 +355,194 @@ function isPriceOrTimeToken(upperToken: string): boolean {
 }
 
 /**
- * Extracts a Shopee voucher code from a deal line while ignoring Vietnamese words
- * and price/time tokens like 100K, 250K, GIAM, DON, SHOPEE.
+ * Extracts a Shopee voucher code from a deal line (stripping URLs first so shortlink slugs
+ * or -i.shopId.itemId IDs are never misread) while ignoring Vietnamese words, spec units,
+ * and price/time tokens like 100K, 250K, 100W, GIAM, DON, SHOPEE.
  */
-function extractVoucherCodeFromLine(line: string): string | null {
-  // Match standalone ASCII alphanumeric tokens (not adjacent to Unicode letters/digits)
-  const tokenRegex = /(?<![\p{L}\p{N}_])([A-Za-z0-9]{4,20})(?![\p{L}\p{N}_])/gu;
-  const candidates: string[] = [];
+function extractVoucherCodeFromLine(rawLine: string): string | null {
+  const line = stripUrlsFromText(rawLine);
+  if (!line) {
+    return null;
+  }
 
-  for (const match of line.matchAll(tokenRegex)) {
-    const raw = match[1];
-    const upper = raw.toUpperCase();
-
-    if (CODE_STOPWORDS.has(upper)) {
+  // Priority 1: Explicit "Mã <CODE>" / "Nhập mã <CODE>" / "Code: <CODE>" with letter + digit
+  const explicitAlnumRe =
+    /(?:nhập\s+mã|mã\s+code|mã|code)\s*[:=-]?\s*(?<![\p{L}\p{N}_])([A-Za-z0-9]{4,20})(?![\p{L}\p{N}_])/giu;
+  for (const match of line.matchAll(explicitAlnumRe)) {
+    const upper = match[1].toUpperCase();
+    if (CODE_STOPWORDS.has(upper) || isPriceOrTimeToken(upper)) {
       continue;
     }
-    if (isPriceOrTimeToken(upper)) {
-      continue;
-    }
-
-    const hasLetter = /[A-Z]/.test(upper);
-    const hasDigit = /\d/.test(upper);
-
-    // Real Shopee voucher codes contain both letters and digits (e.g., AFF1122, VIDEO50K, FMCG100)
-    if (hasLetter && hasDigit) {
-      candidates.push(upper);
+    if (/[A-Z]/.test(upper) && /\d/.test(upper)) {
+      return upper;
     }
   }
 
-  if (candidates.length > 0) {
-    return candidates[0];
-  }
-
-  // Fallback: explicit "Mã CODE" or "Code: CODE" with all-uppercase ASCII >= 5 chars not in stopwords
-  const explicitMatch =
-    /(?:mã|code)\s*[:=-]?\s*(?<![\p{L}\p{N}_])([A-Z0-9]{5,20})(?![\p{L}\p{N}_])/u.exec(line);
-  if (explicitMatch) {
-    const upper = explicitMatch[1].toUpperCase();
+  // Priority 2: Explicit "Mã CODE" / "Code: CODE" with all-uppercase ASCII >= 5 chars not in stopwords
+  const explicitUpperRe =
+    /(?:nhập\s+mã|Nhập\s+mã|NHẬP\s+MÃ|mã|Mã|MÃ|code|Code|CODE)\s*[:=-]?\s*(?<![\p{L}\p{N}_])([A-Z0-9]{5,20})(?![\p{L}\p{N}_])/gu;
+  for (const match of line.matchAll(explicitUpperRe)) {
+    const upper = match[1].toUpperCase();
     if (!CODE_STOPWORDS.has(upper) && !isPriceOrTimeToken(upper)) {
       return upper;
     }
   }
 
+  // Priority 3: Standalone uppercase ASCII alphanumeric tokens (not hyphen-attached like WF-1000XM5)
+  const standaloneUpperRe = /(?<![\p{L}\p{N}_-])([A-Z0-9]{4,20})(?![\p{L}\p{N}_-])/gu;
+  for (const match of line.matchAll(standaloneUpperRe)) {
+    const upper = match[1];
+    if (CODE_STOPWORDS.has(upper) || isPriceOrTimeToken(upper)) {
+      continue;
+    }
+    if (/[A-Z]/.test(upper) && /\d/.test(upper)) {
+      return upper;
+    }
+  }
+
   return null;
+}
+
+function classifySingleUrl(
+  rawUrlToken: string,
+  segmentBefore: string,
+): ClassifiedDealUrl | null {
+  const normalizedToken = /^(?:https?:\/\/|shopeevn:\/\/)/i.test(rawUrlToken)
+    ? rawUrlToken
+    : `https://${rawUrlToken}`;
+
+  const info = extractShopeeLinkInfo(normalizedToken);
+  if (!info.cleanUrl || info.kind === 'cart') {
+    return null;
+  }
+
+  const contextualInfo = extractShopeeLinkInfo(`${segmentBefore} ${normalizedToken}`);
+  const extractedTitle = info.extractedTitle ?? contextualInfo.extractedTitle;
+
+  if (info.kind === 'voucher' || info.kind === 'hub') {
+    return {
+      cleanUrl: info.cleanUrl,
+      role: 'voucher',
+      explicit: true,
+      extractedTitle,
+    };
+  }
+
+  if (info.kind === 'product') {
+    return {
+      cleanUrl: info.cleanUrl,
+      role: 'product',
+      explicit: true,
+      extractedTitle,
+    };
+  }
+
+  const clauses = segmentBefore
+    .split(/[|—–;\n]/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const lastClause = clauses.length > 0 ? clauses[clauses.length - 1] : segmentBefore;
+
+  if (IMMEDIATE_PRODUCT_LABEL_RE.test(lastClause)) {
+    return {
+      cleanUrl: info.cleanUrl,
+      role: 'product',
+      explicit: true,
+      extractedTitle,
+    };
+  }
+
+  if (
+    STRONG_VOUCHER_LABEL_RE.test(lastClause) ||
+    CLAUSE_VOUCHER_LABEL_RE.test(lastClause) ||
+    TAIL_VOUCHER_LABEL_RE.test(lastClause)
+  ) {
+    return {
+      cleanUrl: info.cleanUrl,
+      role: 'voucher',
+      explicit: true,
+      extractedTitle,
+    };
+  }
+
+  if (GENERAL_PRODUCT_CUE_RE.test(lastClause)) {
+    return {
+      cleanUrl: info.cleanUrl,
+      role: 'product',
+      explicit: true,
+      extractedTitle,
+    };
+  }
+
+  return {
+    cleanUrl: info.cleanUrl,
+    role: 'product',
+    explicit: false,
+    extractedTitle,
+  };
+}
+
+function extractClassifiedUrlsFromLine(rawLine: string): ClassifiedDealUrl[] {
+  const extracted: ClassifiedDealUrl[] = [];
+  let prevEnd = 0;
+
+  for (const match of rawLine.matchAll(RAW_URL_TOKEN_RE)) {
+    const matchIndex = match.index ?? 0;
+    const rawToken = match[0];
+    const segmentBefore = rawLine.slice(prevEnd, matchIndex);
+    prevEnd = matchIndex + rawToken.length;
+
+    const classified = classifySingleUrl(rawToken, segmentBefore);
+    if (classified) {
+      extracted.push(classified);
+    }
+  }
+
+  return extracted;
+}
+
+function assignClassifiedUrls(
+  target: { productUrl?: string; voucherUrl?: string },
+  urls: ClassifiedDealUrl[],
+): void {
+  for (const item of urls) {
+    if (item.role === 'voucher') {
+      if (!target.voucherUrl) {
+        target.voucherUrl = item.cleanUrl;
+      } else if (!item.explicit && !target.productUrl) {
+        target.productUrl = item.cleanUrl;
+      }
+    } else {
+      if (!target.productUrl) {
+        target.productUrl = item.cleanUrl;
+      } else if (!item.explicit && !target.voucherUrl) {
+        target.voucherUrl = item.cleanUrl;
+      }
+    }
+  }
+}
+
+function isContinuationLabelOrBareUrl(rawLine: string): boolean {
+  const withoutUrls = stripUrlsFromText(rawLine);
+  if (!withoutUrls) {
+    return true;
+  }
+
+  const pieces = withoutUrls
+    .split(/[|—–;]/)
+    .map((piece) =>
+      piece
+        .replace(/^[\s\-*•🔥⏰📌⚡👉▶️🎟️📦🛒🔗+]+/u, '')
+        .replace(/[\s:=-]+$/u, '')
+        .trim(),
+    )
+    .filter(Boolean);
+
+  if (pieces.length === 0) {
+    return true;
+  }
+
+  return pieces.every((piece) => CONTINUATION_LABEL_PIECE_RE.test(piece));
 }
 
 function extractPaymentMethod(line: string): string {
@@ -370,27 +564,164 @@ function extractPaymentMethod(line: string): string {
   return 'Mọi TT';
 }
 
-function extractDiscountNote(line: string, voucherCode: string): string {
-  // Remove leading bullet/time prefix and extract the human-readable condition summary
-  let cleaned = line
-    .replace(/^[\s\-*•🔥⏰📌⚡👉▶️]+/u, '')
-    .replace(/^(?:khung\s*)?(?:[01]?\d|2[0-3])\s*(?::[0-5]\d|[hgHG](?:[0-5]\d)?)\s*[:\-–]?\s*/iu, '')
+function stripUrlsAndLinkLabels(rawLine: string): string {
+  let text = rawLine.replace(LABELED_URL_CLAUSE_RE, ' ');
+  text = stripUrlsFromText(text);
+  // Strip any leftover leading/trailing link label fragments or separators
+  text = text
+    .replace(
+      /(?:\s*[|—–;-]\s*)(?:(?:link|đường\s*dẫn)\s*(?:lưu\s*)?(?:sp|sản\s*phẩm|mua|mã|voucher)|lưu\s*(?:mã|voucher)(?:\s*tại)?|mua\s*(?:sp|ngay)(?:\s*tại)?|kho\s*mã|claim)\s*[:=-]?\s*$/iu,
+      '',
+    )
+    .replace(/[\s|—–;,-]+$/u, '')
+    .replace(/\s+/g, ' ')
     .trim();
+  return text;
+}
 
-  // Remove the "Mã <CODE>" prefix if present so voucherNote focuses on discount & min-spend
-  const codePattern = new RegExp(`^(?:mã|code|voucher)?\\s*[:=-]?\\s*${voucherCode}\\s*[:\\-–]?\\s*`, 'iu');
-  cleaned = cleaned.replace(codePattern, '').trim();
+function stripLeadingPrefixAndSlot(line: string): string {
+  return line
+    .replace(/^[\s\-*•🔥⏰📌⚡👉▶️🎧🎟️📦🛒🔗]+/u, '')
+    .replace(
+      /^(?:khung(?:\s*giờ)?\s*)?(?:[01]?\d|2[0-3])\s*(?::[0-5]\d|[hgHG](?:[0-5]\d)?)(?:\s*(?:sáng|trưa|chiều|tối|đêm))?\s*[:\-–—]?\s*/iu,
+      '',
+    )
+    .trim();
+}
+
+function capitalizeFirst(text: string): string {
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function extractDiscountNote(rawLine: string, voucherCode: string, hasUrls = false): string {
+  const baseLine = hasUrls ? stripUrlsAndLinkLabels(rawLine) : rawLine;
+
+  // Remove leading bullet/time prefix and extract the human-readable condition summary
+  let cleaned = stripLeadingPrefixAndSlot(baseLine);
+
+  if (voucherCode) {
+    // Remove the leading "Mã <CODE>" prefix if present so voucherNote focuses on discount & min-spend
+    const codePattern = new RegExp(
+      `^(?:nhập\\s+mã|mã|code|voucher)?\\s*[:=-]?\\s*${voucherCode}\\s*[:\\-–]?\\s*`,
+      'iu',
+    );
+    cleaned = cleaned.replace(codePattern, '').trim();
+  }
 
   if (!cleaned) {
-    return line.trim();
+    return (hasUrls ? baseLine : rawLine).trim();
   }
-  // Capitalize first letter nicely
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return capitalizeFirst(cleaned);
+}
+
+function buildCodeDealTitleAndNote(
+  rawLine: string,
+  voucherCode: string,
+  hasUrls: boolean,
+  headline: string | null,
+): { title: string; voucherNote: string } {
+  const lineNote = extractDiscountNote(rawLine, voucherCode, hasUrls);
+
+  let voucherNote = lineNote;
+  if (headline) {
+    const cleanHead = capitalizeFirst(headline);
+    const strippedLineNote = lineNote.replace(/^[\s•\-–—:]+/u, '').trim();
+    const isJustCodeEcho =
+      !strippedLineNote ||
+      new RegExp(`^(?:mã|code)?\\s*[:=-]?\\s*${voucherCode}$`, 'iu').test(strippedLineNote);
+    if (isJustCodeEcho) {
+      voucherNote = cleanHead;
+    } else if (strippedLineNote.startsWith('(')) {
+      voucherNote = `${cleanHead} ${strippedLineNote}`;
+    } else {
+      voucherNote = `${cleanHead} • ${strippedLineNote}`;
+    }
+  }
+
+  let summaryWithoutPayment = voucherNote.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (voucherCode) {
+    const inlineCodeRe = new RegExp(
+      `\\s*(?:nhập\\s+mã|mã|code)\\s*[:=-]?\\s*${voucherCode}\\b`,
+      'giu',
+    );
+    summaryWithoutPayment = summaryWithoutPayment
+      .replace(inlineCodeRe, '')
+      .replace(/[\s•\-–—:|]+$/u, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  const title = summaryWithoutPayment
+    ? `Mã ${voucherCode} — ${capitalizeFirst(summaryWithoutPayment)}`
+    : `Săn mã ${voucherCode}`;
+
+  return { title, voucherNote };
+}
+
+function buildLinkOnlyTitleAndNote(
+  rawLine: string,
+  slotTime: string,
+  urls: ClassifiedDealUrl[],
+  links: { productUrl?: string; voucherUrl?: string },
+  headline: string | null,
+): { title: string; voucherNote: string } {
+  const cleanedLineText = stripLeadingPrefixAndSlot(stripUrlsAndLinkLabels(rawLine))
+    .replace(/(?:^|\s+)(?:hãy\s+)?(?:mua\s+ngay|xem\s+ngay|săn\s+ngay)\s+trên\s+shopee.*$/iu, '')
+    .replace(/^(?:(?:link|đường\s*dẫn)\s*(?:lưu\s*)?(?:sp|sản\s*phẩm|mua|mã|voucher)|lưu\s*(?:mã|voucher)|kho\s*mã|claim)\s*[:=-]?\s*$/iu, '')
+    .trim();
+
+  const bestExtractedTitle =
+    urls.find((u) => u.role === 'product' && u.extractedTitle)?.extractedTitle ??
+    urls.find((u) => u.extractedTitle)?.extractedTitle ??
+    null;
+
+  const isShareBoilerplate = /(?:mua\s+ngay|xem\s+ngay|săn\s+ngay)\s+trên\s+shopee|với\s+giá\s+chỉ/iu.test(
+    rawLine,
+  );
+
+  let title = '';
+  if (headline) {
+    title = capitalizeFirst(headline);
+  } else if (isShareBoilerplate && bestExtractedTitle) {
+    title = capitalizeFirst(bestExtractedTitle);
+  } else if (cleanedLineText) {
+    title = capitalizeFirst(cleanedLineText.replace(/\s*\([^)]*\)\s*$/, '').trim() || cleanedLineText);
+  } else if (bestExtractedTitle) {
+    title = capitalizeFirst(bestExtractedTitle);
+  } else if (links.productUrl && links.voucherUrl) {
+    title = `Combo Sản phẩm & Voucher (${slotTime})`;
+  } else if (links.productUrl) {
+    title = `Deal sản phẩm theo link (${slotTime})`;
+  } else {
+    title = `Lưu voucher theo link (${slotTime})`;
+  }
+
+  let voucherNote = '';
+  if (headline && cleanedLineText && cleanedLineText.toLowerCase() !== headline.toLowerCase()) {
+    voucherNote = `${capitalizeFirst(headline)} • ${capitalizeFirst(cleanedLineText)}`;
+  } else if (cleanedLineText) {
+    voucherNote = capitalizeFirst(cleanedLineText);
+  } else if (headline) {
+    voucherNote = capitalizeFirst(headline);
+  } else if (bestExtractedTitle) {
+    voucherNote = `Săn trực tiếp qua link Shopee: ${capitalizeFirst(bestExtractedTitle)}`;
+  } else if (links.productUrl && links.voucherUrl) {
+    voucherNote = 'Mở trực tiếp link sản phẩm & lưu voucher đi kèm';
+  } else if (links.productUrl) {
+    voucherNote = 'Mở trực tiếp link sản phẩm Shopee';
+  } else {
+    voucherNote = 'Mở trực tiếp trạm lưu voucher Shopee';
+  }
+
+  return { title, voucherNote };
 }
 
 /**
  * Parses multi-line Vietnamese deal group posts (Zalo / Telegram / Facebook)
  * into structured `ParsedDealCandidate[]` items ready to add to the Runbook.
+ * Supports text voucher codes, paired `[productUrl + voucherUrl]` combos,
+ * multi-line grouped blocks, and link-only deals (`voucherCode: ''`).
  */
 export function parseDealTextPaste(rawText: string): ParsedDealCandidate[] {
   if (!rawText || typeof rawText !== 'string') {
@@ -400,47 +731,194 @@ export function parseDealTextPaste(rawText: string): ParsedDealCandidate[] {
   const lines = rawText.split(/\r?\n/);
   const results: ParsedDealCandidate[] = [];
   let activeSlotTime = '00:00';
+  let pendingHeadline: string | null = null;
+  let canAttachContinuation = false;
+  let lastDealFromHeadline = false;
+  let lastDealHeadline: string | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i].trim();
     if (!rawLine) {
+      pendingHeadline = null;
+      canAttachContinuation = false;
+      lastDealFromHeadline = false;
       continue;
     }
 
-    const lineSlotTime = extractSlotTimeFromText(rawLine);
+    const urls = extractClassifiedUrlsFromLine(rawLine);
+    const lineWithoutUrls = stripUrlsFromText(rawLine);
+    const lineSlotTime = extractSlotTimeFromText(lineWithoutUrls);
     const voucherCode = extractVoucherCodeFromLine(rawLine);
 
-    // If the line has a time marker (e.g. "🔥 KHUNG 0H:") and no voucher code, treat it as a section header
-    if (lineSlotTime !== null && voucherCode === null) {
-      activeSlotTime = lineSlotTime;
+    // Case 1: Line has NO voucher code and NO URLs
+    if (voucherCode === null && urls.length === 0) {
+      if (lineSlotTime !== null) {
+        activeSlotTime = lineSlotTime;
+        const startsWithKhung = /^[\s\-*•🔥⏰📌⚡👉▶️]*khung\b/iu.test(lineWithoutUrls);
+        const remainder = startsWithKhung ? '' : stripLeadingPrefixAndSlot(lineWithoutUrls);
+        pendingHeadline = remainder.length > 0 ? remainder : null;
+        canAttachContinuation = false;
+        lastDealFromHeadline = false;
+        continue;
+      }
+
+      // Sub-bullet note inside an active deal block (e.g. "- Đơn từ 200K, ShopeePay"):
+      // keep continuation attachment alive and capture payment hint if still default.
+      const isBulletLine = /^[\s]*[\-*•👉▶️📌]/u.test(rawLine);
+      if (canAttachContinuation && isBulletLine && results.length > 0) {
+        const lastDeal = results[results.length - 1];
+        const notePayment = extractPaymentMethod(lineWithoutUrls);
+        if (lastDeal.paymentMethod === 'Mọi TT' && notePayment !== 'Mọi TT') {
+          lastDeal.paymentMethod = notePayment;
+        }
+        continue;
+      }
+
+      // Standalone non-bullet headline before indented/bulleted sub-lines
+      const isAllCapsBanner =
+        lineWithoutUrls.length > 15 && lineWithoutUrls === lineWithoutUrls.toUpperCase();
+      if (!isBulletLine && !isAllCapsBanner && /\p{L}/u.test(lineWithoutUrls)) {
+        pendingHeadline = stripLeadingPrefixAndSlot(lineWithoutUrls) || null;
+        canAttachContinuation = false;
+        lastDealFromHeadline = false;
+      }
       continue;
     }
 
-    if (voucherCode === null) {
-      continue;
+    // Case 2: Continuation line attaching URLs onto the immediately preceding deal
+    if (
+      canAttachContinuation &&
+      results.length > 0 &&
+      urls.length > 0 &&
+      lineSlotTime === null
+    ) {
+      const lastDeal = results[results.length - 1];
+      const hasNoConflictingCode =
+        voucherCode === null || voucherCode === lastDeal.voucherCode;
+
+      if (hasNoConflictingCode) {
+        const updatedLinks = {
+          productUrl: lastDeal.productUrl,
+          voucherUrl: lastDeal.voucherUrl,
+        };
+        assignClassifiedUrls(updatedLinks, urls);
+        const actuallyAddedNewLink =
+          updatedLinks.productUrl !== lastDeal.productUrl ||
+          updatedLinks.voucherUrl !== lastDeal.voucherUrl;
+
+        const isLabelOrBare = isContinuationLabelOrBareUrl(rawLine);
+        const attachesToCodeOnlyDeal =
+          lastDeal.voucherCode !== '' && !lastDeal.productUrl && !lastDeal.voucherUrl;
+
+        if (
+          actuallyAddedNewLink &&
+          (isLabelOrBare || lastDealFromHeadline || attachesToCodeOnlyDeal)
+        ) {
+          if (updatedLinks.productUrl) lastDeal.productUrl = updatedLinks.productUrl;
+          if (updatedLinks.voucherUrl) lastDeal.voucherUrl = updatedLinks.voucherUrl;
+
+          const contPayment = extractPaymentMethod(lineWithoutUrls);
+          if (lastDeal.paymentMethod === 'Mọi TT' && contPayment !== 'Mọi TT') {
+            lastDeal.paymentMethod = contPayment;
+          }
+
+          // Upgrade generic fallback link-only title if product slug provided a real title
+          const slugTitle = urls.find((u) => u.extractedTitle)?.extractedTitle;
+          if (
+            slugTitle &&
+            lastDeal.voucherCode === '' &&
+            /^(?:Deal sản phẩm|Combo Sản phẩm|Lưu voucher) theo link/u.test(lastDeal.title)
+          ) {
+            lastDeal.title = capitalizeFirst(slugTitle);
+          }
+
+          lastDeal.rawLine = `${lastDeal.rawLine}\n${rawLine}`;
+          continue;
+        }
+      }
     }
 
+    // Case 3: Headline block where Link SP appeared before "- Mã: CODE"
+    if (
+      canAttachContinuation &&
+      lastDealFromHeadline &&
+      results.length > 0 &&
+      voucherCode !== null &&
+      lineSlotTime === null
+    ) {
+      const lastDeal = results[results.length - 1];
+      const hasConflictingProduct =
+        Boolean(lastDeal.productUrl) && urls.some((u) => u.role === 'product' && u.explicit);
+      if (lastDeal.voucherCode === '' && !hasConflictingProduct) {
+        lastDeal.voucherCode = voucherCode;
+        lastDeal.id = `parsed-deal-${results.length}-${voucherCode.toLowerCase()}`;
+
+        const updatedLinks = {
+          productUrl: lastDeal.productUrl,
+          voucherUrl: lastDeal.voucherUrl,
+        };
+        assignClassifiedUrls(updatedLinks, urls);
+        if (updatedLinks.productUrl) lastDeal.productUrl = updatedLinks.productUrl;
+        if (updatedLinks.voucherUrl) lastDeal.voucherUrl = updatedLinks.voucherUrl;
+
+        const codePayment = extractPaymentMethod(lineWithoutUrls);
+        if (codePayment !== 'Mọi TT') {
+          lastDeal.paymentMethod = codePayment;
+        }
+
+        const { title, voucherNote } = buildCodeDealTitleAndNote(
+          rawLine,
+          voucherCode,
+          urls.length > 0,
+          lastDealHeadline,
+        );
+        lastDeal.title = title;
+        lastDeal.voucherNote = voucherNote;
+        lastDeal.rawLine = `${lastDeal.rawLine}\n${rawLine}`;
+        continue;
+      }
+    }
+
+    // Case 4: Create a new ParsedDealCandidate (code deal, combo deal, or link-only deal)
     const slotTime = lineSlotTime ?? activeSlotTime;
     if (lineSlotTime !== null) {
       activeSlotTime = lineSlotTime;
     }
 
-    const paymentMethod = extractPaymentMethod(rawLine);
-    const voucherNote = extractDiscountNote(rawLine, voucherCode);
-    const summaryWithoutPayment = voucherNote.replace(/\s*\([^)]*\)\s*$/, '').trim();
-    const title = summaryWithoutPayment
-      ? `Mã ${voucherCode} — ${summaryWithoutPayment}`
-      : `Săn mã ${voucherCode}`;
+    const isBulletSubLine = /^[\s]*[\-*•👉▶️📌🎟️📦🛒🔗]/u.test(rawLine);
+    const consumedHeadline =
+      pendingHeadline && (isBulletSubLine || lineSlotTime === null) ? pendingHeadline : null;
+    pendingHeadline = null;
 
-    results.push({
-      id: `parsed-deal-${results.length + 1}-${voucherCode.toLowerCase()}`,
+    const links: { productUrl?: string; voucherUrl?: string } = {};
+    assignClassifiedUrls(links, urls);
+
+    const paymentMethod = extractPaymentMethod(
+      consumedHeadline ? `${consumedHeadline} ${lineWithoutUrls}` : lineWithoutUrls,
+    );
+
+    const effectiveCode = voucherCode ?? '';
+    const { title, voucherNote } = effectiveCode
+      ? buildCodeDealTitleAndNote(rawLine, effectiveCode, urls.length > 0, consumedHeadline)
+      : buildLinkOnlyTitleAndNote(rawLine, slotTime, urls, links, consumedHeadline);
+
+    const idSuffix = effectiveCode ? effectiveCode.toLowerCase() : 'link';
+    const candidate: ParsedDealCandidate = {
+      id: `parsed-deal-${results.length + 1}-${idSuffix}`,
       slotTime,
-      voucherCode,
+      voucherCode: effectiveCode,
       title,
       voucherNote,
       paymentMethod,
       rawLine,
-    });
+      ...(links.productUrl ? { productUrl: links.productUrl } : {}),
+      ...(links.voucherUrl ? { voucherUrl: links.voucherUrl } : {}),
+    };
+
+    results.push(candidate);
+    canAttachContinuation = true;
+    lastDealFromHeadline = consumedHeadline !== null;
+    lastDealHeadline = consumedHeadline;
   }
 
   return results;
