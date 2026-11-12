@@ -186,3 +186,166 @@
   - `compareChannelStacks(input)` & `DEFAULT_STACK_INPUT`: Tính chồng 3 tầng mã (Shop → Sàn/Video/Live → Ship/Xu/Thanh toán) và phát hiện bẫy hụt đơn tối thiểu sau khi trừ Mã Shop.
 - [x] Viết unit test đầy đủ tại `tests/yearRoundDeals.test.ts` (kiểm thử cả với `TZ=UTC`).
 
+### Task 8 (`v2-ui` & `deeplink`): Giao diện VoucherMaxHub, Deep-Link Shopee App & Mobile Cockpit
+- [x] Cài đặt `VoucherMaxHub.tsx` tích hợp Radar sale 365 ngày, 8 Trạm lưu mã chính thống, Smart Paste và Bảng tính chồng 3 tầng mã.
+- [x] Bổ sung `detectLaunchPlatform`, `buildShopeeLaunchTargets` và `copyAndLaunchShopee` (`shopeevn://` + Android `intent://`) kèm unit tests tại `tests/deeplink.test.ts` và `tests/v2-max-voucher.test.tsx`.
+- [x] Tối ưu giao diện Mobile Cockpit mật độ cao và migrate các URL `/cart` cũ sang các Hub lưu mã thực tế trên Shopee.
+
+### Checkpoint: Complete Phase v2.0
+- [x] Toàn bộ unit & integration tests v1.0 + v2.0 pass 100%, `npm run build` sạch lỗi.
+
+---
+
+## Phase v2.1: Ghép Cặp `[Link Sản Phẩm + Link Voucher]` Chốt Đơn 1-Chạm (6-Agent Swarm)
+
+### Task 9 (`contracts-links` — Wave 1): Hợp đồng Kiểu Ghép Cặp, Bóc Tách Share-Text & Universal Link Launcher
+
+**Description:** Mở rộng hợp đồng kiểu tương thích ngược 100% cho mô hình cặp `[productUrl + voucherUrl + strikeMode]`, cài đặt bộ lọc văn bản chia sẻ Shopee App (`extractShopeeLinkInfo`), xử lý điều hướng Universal Link / Android App Link cho shortlink (`vn.shp.ee`, `s.shopee.vn`) không bị lạc về `/cart`, và lưu trữ bền vững trong `localStorage`.
+
+**Acceptance criteria:**
+- [ ] `src/types/contracts.ts` bổ sung `StrikeMode` (`'checkout-wait' | 'flash-product'`), `ShopeeLinkKind`, `ExtractedShopeeLink`, mở rộng tùy chọn `productUrl`, `voucherUrl`, `strikeMode` trên `DealRunbookItem` và `productUrl`, `voucherUrl` trên `ParsedDealCandidate`.
+- [ ] `src/lib/clipboard.ts` cài đặt `extractShopeeLinkInfo(rawInput)` tách sạch `cleanUrl` (cắt dấu câu thừa cuối link), tự động trích xuất `extractedTitle` từ câu rao Shopee App hoặc slug `-i.{shopId}.{itemId}`, lấy `shopId`/`itemId` và phân loại đúng `ShopeeLinkKind`.
+- [ ] `buildShopeeLaunchTargets` lọc `cleanUrl` từ chuỗi share-text trước khi parse để không bao giờ bị fallback nhầm về `/cart`; `copyAndLaunchShopee` mở shortlink trực tiếp qua OS Universal Link / App Link ở `auto-app` trên Android/iOS và qua `intent://...#Intent;scheme=https;package=com.shopee.vn...` ở `force-app` trên Android, giữ tương thích 100% với `tests/deeplink.test.ts`.
+- [ ] `src/lib/storage.ts` bảo toàn `productUrl`, `voucherUrl`, `strikeMode` khi đọc/ghi `localStorage` và tự ánh xạ `shopeeUrl` (khác `/cart`) sang `voucherUrl` cho dữ liệu cũ chưa có `voucherUrl`.
+- [ ] `tests/productVoucherLinks.test.ts` bao phủ đầy đủ Share-Text extraction, phân loại link, điều hướng shortlink trên Android/iOS/Desktop và round-trip `storage.ts`.
+
+**Verification:**
+- [ ] Tests pass: `npx vitest run tests/deeplink.test.ts tests/productVoucherLinks.test.ts`
+- [ ] Build succeeds: `npm test && npm run build`
+
+**Dependencies:** Phase v2.0
+
+**Files owned:**
+- `src/types/contracts.ts`
+- `src/lib/clipboard.ts`
+- `src/lib/storage.ts`
+- `tests/productVoucherLinks.test.ts`
+
+---
+
+### Task 10 (`plan-architect` — Wave 1): Đặc Tả Kiến Trúc v2.1 & Kế Hoạch Điều Phối Swarm
+
+**Description:** Cập nhật tài liệu đặc tả nguồn `SPEC.md`, kế hoạch điều phối `tasks/plan.md` và danh mục kiểm tra `tasks/todo.md` cho Milestone v2.1 mà vẫn bảo toàn toàn bộ lịch sử hoàn thành v1.0 / v2.0.
+
+**Acceptance criteria:**
+- [x] `SPEC.md` bổ sung đầy đủ đặc tả Milestone v2.1: mô hình ghép cặp `productUrl` + `voucherUrl` + `voucherCode` kèm `strikeMode` (`checkout-wait` vs `flash-product`), bóc tách thông minh Share-Text Shopee App, cơ chế Universal Link / App Link chống lạc về `/cart`, và cụm nút 1-chạm (`🎟️ Lưu Mã` + `📦 Mở SP` + `🛒 Giỏ hàng`) + đính link inline + Smart Paste combo.
+- [x] `tasks/plan.md` & `tasks/todo.md` ghi rõ phân rã công việc cho 6 Swarm agents (`contracts-links`, `plan-architect`, `combo-parser`, `pair-ui`, `integrator`, `verifier`) kèm quyền sở hữu file không chồng lấn, tiêu chí nghiệm thu và các mốc Verification Checkpoints.
+
+**Verification:**
+- [x] Manual check: Kiểm tra `git diff` chỉ chạm đúng 3 file tài liệu (`SPEC.md`, `tasks/plan.md`, `tasks/todo.md`), không sửa bất kỳ file nào trong `src/`, `public/`, `tests/`.
+
+**Dependencies:** Phase v2.0
+
+**Files owned:**
+- `SPEC.md`
+- `tasks/plan.md`
+- `tasks/todo.md`
+
+---
+
+### Checkpoint: After Wave 1 (`contracts-links` + `plan-architect`)
+- [ ] Hợp đồng kiểu v2.1 và hàm `extractShopeeLinkInfo` + Universal Link launcher đã merge sạch, pass 100% unit tests (`deeplink.test.ts` & `productVoucherLinks.test.ts`).
+- [ ] Tài liệu đặc tả `SPEC.md` và kế hoạch điều phối Swarm v2.1 đã sẵn sàng làm chuẩn tham chiếu cho Wave 2–4.
+
+---
+
+### Task 11 (`combo-parser` — Wave 2): Nâng Cấp Smart Paste Combo Parser `[SP + Voucher]`
+
+**Description:** Nâng cấp bộ phân tích tin nhắn deal trong `src/lib/yearRoundDeals.ts` để tự động nhận diện, phân loại và ghép cặp cả `productUrl` (link sản phẩm / shortlink SP kèm tên món) lẫn `voucherUrl` (link lưu mã / trạm voucher) cùng `voucherCode` từ văn bản copy trên Zalo / Telegram / Facebook.
+
+**Acceptance criteria:**
+- [ ] `parseDealTextPaste(rawText)` sử dụng `extractShopeeLinkInfo` để bóc tách chính xác `productUrl` và `voucherUrl` trên từng dòng hoặc cụm dòng deal liên tiếp trong cùng khung giờ, đồng thời tận dụng `extractedTitle` làm tên món dễ hiểu khi có văn bản chia sẻ SP.
+- [ ] Cập nhật `SAMPLE_DEAL_PASTE_TEXT` minh họa rõ kịch bản thực tế có đính kèm cặp link sản phẩm rút gọn + link lưu voucher + mã ký tự mà không phá vỡ các test hiện hữu.
+- [ ] Mở rộng `tests/yearRoundDeals.test.ts` kiểm thử đầy đủ các ca dán combo `[Link SP + Link Voucher + Mã]`, chỉ có Link SP, chỉ có Link Voucher, và nhiều link trong cùng bản tin.
+
+**Verification:**
+- [ ] Tests pass: `npx vitest run tests/yearRoundDeals.test.ts`
+- [ ] Build succeeds: `npm run typecheck`
+
+**Dependencies:** Task 9 (`contracts-links`)
+
+**Files owned:**
+- `src/lib/yearRoundDeals.ts`
+- `tests/yearRoundDeals.test.ts`
+
+---
+
+### Task 12 (`pair-ui` — Wave 2): Giao Diện Ghép Cặp Link, Đính Link Inline & Cụm Nút 1-Chạm
+
+**Description:** Nâng cấp các React components sang trải nghiệm Ghép Cặp `[SP + Voucher]` 1-chạm trên di động: tự lọc câu rao Shopee App khi dán link vào form, hỗ trợ đính/sửa nhanh link ngay trên thẻ Runbook hiện có, chọn chế độ `strikeMode`, và hiển thị cụm nút `🎟️ Lưu Mã` + `📦 Mở SP` + `🛒 Giỏ hàng` trên cả thẻ Runbook, `LiveStrikeBar` và `VoucherMaxHub`.
+
+**Acceptance criteria:**
+- [ ] `RunbookForm.tsx` có ô nhập `productUrl` (dán nguyên câu chia sẻ Shopee App tự lọc URL sạch & tự điền tên món nếu đang trống), ô `voucherUrl` (kèm gợi ý chọn nhanh Hub lưu mã) và nút chọn `strikeMode` (`checkout-wait` vs `flash-product`).
+- [ ] `RunbookList.tsx` hiển thị rõ trạng thái cặp link + huy hiệu `strikeMode` trên từng thẻ, tích hợp cụm nút hành động 1-chạm (`🎟️ Lưu Mã`, `📦 Mở SP`, `🛒 Giỏ hàng` — tự động copy `voucherCode` trước khi mở Shopee), và cho phép bấm **Đính/Sửa Link** ngay trên thẻ (inline attachment/editor) không cần xóa tạo lại.
+- [ ] `LiveStrikeBar.tsx` hiển thị thanh hành động 1-chạm tương ứng với cặp `productUrl` / `voucherUrl` và `strikeMode` của ca săn đang chọn ngay dưới/cạnh đồng hồ `0.1s`.
+- [ ] `VoucherMaxHub.tsx` hiển thị preview các tag `[📦 Có Link SP]` / `[🎟️ Có Link Mã]` cho kết quả Smart Paste combo và cho phép mở thử hoặc nạp trọn bộ cặp link vào Runbook.
+- [ ] `src/styles/global.css` đảm bảo bố cục gọn gàng trên màn hình hẹp `360px`, tương phản rõ và vùng chạm cảm ứng chuẩn mobile.
+
+**Verification:**
+- [ ] Build succeeds: `npm run typecheck && npm run build`
+- [ ] Manual check: Kiểm tra hiển thị và tương tác trên kích thước mobile `360x800` & `375x812`.
+
+**Dependencies:** Task 9 (`contracts-links`)
+
+**Files owned:**
+- `src/components/RunbookForm.tsx`
+- `src/components/RunbookList.tsx`
+- `src/components/LiveStrikeBar.tsx`
+- `src/components/VoucherMaxHub.tsx`
+- `src/styles/global.css`
+
+---
+
+### Checkpoint: After Wave 2 (`combo-parser` + `pair-ui`)
+- [ ] Engine Smart Paste combo pass 100% unit tests trong `tests/yearRoundDeals.test.ts`.
+- [ ] Toàn bộ UI components mới biên dịch sạch kiểu (`tsc -b`), không xung đột file giữa `combo-parser` và `pair-ui`.
+
+---
+
+### Task 13 (`integrator` — Wave 3): Tích Hợp Toàn Luồng `App.tsx` & Kiểm Thử Tích Hợp v2.1
+
+**Description:** Hợp nhất kết quả của Wave 1 & Wave 2 vào `src/App.tsx`, kết nối state cập nhật inline cặp link/`strikeMode` trên thẻ Runbook, truyền trọn vẹn `productUrl` + `voucherUrl` từ Smart Paste sang danh sách kịch bản săn mã, và bổ sung integration tests kiểm chứng toàn bộ luồng người dùng v2.1.
+
+**Acceptance criteria:**
+- [ ] `src/App.tsx` kết nối đầy đủ handler cập nhật inline (`productUrl`, `voucherUrl`, `strikeMode`, `title`) cho từng `DealRunbookItem`, đồng bộ tức thì xuống `localStorage` và `LiveStrikeBar`.
+- [ ] Khi nạp deal từ Smart Paste trong `VoucherMaxHub`, các trường `productUrl` và `voucherUrl` được bảo toàn vào `DealRunbookItem` mới (và tự suy luận `strikeMode` hợp lý hoặc giữ mặc định chuẩn).
+- [ ] Mở rộng `tests/storage-ui.test.tsx` và `tests/v2-max-voucher.test.tsx` kiểm tra: dán chuỗi chia sẻ Shopee App tự lọc URL + tên món, đính link inline trên thẻ có sẵn, lưu `localStorage` bền vững, nạp combo từ Smart Paste, và bấm các nút `🎟️ Lưu Mã` / `📦 Mở SP` / `🛒 Giỏ hàng`.
+
+**Verification:**
+- [ ] Tests pass: `npm test`
+- [ ] Build succeeds: `npm run typecheck && npm run build`
+
+**Dependencies:** Task 10, Task 11, Task 12
+
+**Files owned:**
+- `src/App.tsx`
+- `tests/storage-ui.test.tsx`
+- `tests/v2-max-voucher.test.tsx`
+
+---
+
+### Task 14 (`verifier` — Wave 4): Kiểm Định Độc Lập & Nghiệm Thu Milestone v2.1
+
+**Description:** Agent kiểm định độc lập (`verifier`) đối chiếu toàn bộ mã nguồn đã hợp nhất với `SPEC.md` (Milestone v2.1 & Boundaries), chạy toàn bộ bộ kiểm thử tự động, kiểm tra đóng gói production và xác nhận không có lỗi hồi quy ở các tính năng v1.0 / v2.0.
+
+**Acceptance criteria:**
+- [ ] 100% test files (`smoke`, `timeSync`, `optimizer`, `deeplink`, `productVoucherLinks`, `yearRoundDeals`, `storage-ui`, `v2-max-voucher`) pass tuyệt đối.
+- [ ] `npm run typecheck` và `npm run build` hoàn tất với 0 lỗi.
+- [ ] Xác nhận shortlink (`vn.shp.ee`, `s.shopee.vn`) mở qua Universal Link / App Link đúng chuẩn, không bị điều hướng nhầm về `/cart`, và tuân thủ 100% ranh giới an toàn trong `SPEC.md` (không auto-click, không gọi ngầm API Shopee).
+
+**Verification:**
+- [ ] Tests pass: `npm test`
+- [ ] Build succeeds: `npm run typecheck && npm run build`
+
+**Dependencies:** Task 13 (`integrator`)
+
+**Files owned:**
+- *(Read-only verification & report to Coordinator)*
+
+---
+
+### Checkpoint: Complete Phase v2.1
+- [ ] Mọi tiêu chí nghiệm thu của Milestone v2.1 trong `SPEC.md` đạt 100%.
+- [ ] Toàn bộ test suite pass, bản build production sạch lỗi và sẵn sàng sử dụng thực chiến trên điện thoại.
+
+
