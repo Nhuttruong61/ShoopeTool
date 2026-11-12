@@ -1,6 +1,16 @@
-import React, { useMemo, useState } from 'react';
-import { extractShopeeLinkInfo } from '../lib/clipboard';
-import type { DealRunbookItem, StrikeMode } from '../types/contracts';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  copyAndLaunchShopee,
+  extractShopeeLinkInfo,
+  resolveShopeeShortLink,
+} from '../lib/clipboard';
+import { buildProductVoucherSuggestions } from '../lib/yearRoundDeals';
+import type {
+  AutoProductVoucherItem,
+  DealRunbookItem,
+  ExtractedShopeeLink,
+  StrikeMode,
+} from '../types/contracts';
 
 export type DealRunbookDraft = Omit<
   DealRunbookItem,
@@ -9,6 +19,7 @@ export type DealRunbookDraft = Omit<
 
 export interface RunbookFormProps {
   onAddDeal: (draft: DealRunbookDraft) => void;
+  onDirectUseVoucher?: (voucher: AutoProductVoucherItem) => void;
 }
 
 export const PRESET_SLOTS: readonly string[] = [
@@ -48,7 +59,10 @@ export const STRIKE_MODE_OPTIONS: ReadonlyArray<{
   },
 ];
 
-export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
+export const RunbookForm: React.FC<RunbookFormProps> = ({
+  onAddDeal,
+  onDirectUseVoucher,
+}) => {
   const [slotTime, setSlotTime] = useState<string>('00:00');
   const [title, setTitle] = useState<string>('');
   const [itemsSummary, setItemsSummary] = useState<string>('');
@@ -58,9 +72,55 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
   const [productRaw, setProductRaw] = useState<string>('');
   const [voucherRaw, setVoucherRaw] = useState<string>('');
   const [strikeMode, setStrikeMode] = useState<StrikeMode>('checkout-wait');
+  const [resolvedProductInfo, setResolvedProductInfo] =
+    useState<ExtractedShopeeLink | null>(null);
+  const [isResolvingLink, setIsResolvingLink] = useState<boolean>(false);
 
-  const productInfo = useMemo(() => extractShopeeLinkInfo(productRaw), [productRaw]);
+  const syncProductInfo = useMemo(() => extractShopeeLinkInfo(productRaw), [productRaw]);
+  const productInfo = useMemo<ExtractedShopeeLink>(() => {
+    if (resolvedProductInfo && resolvedProductInfo.cleanUrl) {
+      return {
+        ...syncProductInfo,
+        ...resolvedProductInfo,
+        extractedTitle:
+          resolvedProductInfo.extractedTitle ?? syncProductInfo.extractedTitle,
+      };
+    }
+    return syncProductInfo;
+  }, [syncProductInfo, resolvedProductInfo]);
+
   const voucherInfo = useMemo(() => extractShopeeLinkInfo(voucherRaw), [voucherRaw]);
+
+  const autoProductVouchers = useMemo(() => {
+    if (!productInfo.cleanUrl) return [];
+    return buildProductVoucherSuggestions(productRaw, productInfo, slotTime);
+  }, [productRaw, productInfo, slotTime]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (syncProductInfo.kind !== 'shortlink' || !syncProductInfo.cleanUrl) {
+      setResolvedProductInfo(null);
+      setIsResolvingLink(false);
+      return;
+    }
+
+    setIsResolvingLink(true);
+    void resolveShopeeShortLink(productRaw).then((resolved) => {
+      if (cancelled) return;
+      setIsResolvingLink(false);
+      if (resolved.cleanUrl && resolved.cleanUrl !== syncProductInfo.cleanUrl) {
+        setResolvedProductInfo(resolved);
+        if (resolved.extractedTitle) {
+          setTitle((prev) => (prev.trim() ? prev : resolved.extractedTitle!));
+          setItemsSummary((prev) => (prev.trim() ? prev : resolved.extractedTitle!));
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productRaw, syncProductInfo.kind, syncProductInfo.cleanUrl]);
 
   const handleProductChange = (nextRaw: string) => {
     setProductRaw(nextRaw);
@@ -73,6 +133,27 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
         setItemsSummary(info.extractedTitle);
       }
     }
+  };
+
+  const handleApplyAutoVoucher = (v: AutoProductVoucherItem) => {
+    setVoucherRaw(v.voucherUrl);
+    setVoucherNote(v.voucherNote);
+    setTitle(v.title);
+    setStrikeMode(v.strikeMode);
+    if (v.voucherCode) {
+      setVoucherCode(v.voucherCode);
+    }
+  };
+
+  const handleDirectUseAutoVoucher = (v: AutoProductVoucherItem) => {
+    if (onDirectUseVoucher) {
+      onDirectUseVoucher(v);
+      return;
+    }
+    void copyAndLaunchShopee({
+      voucherCode: v.voucherCode || undefined,
+      targetUrl: v.productUrl || v.voucherUrl,
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -186,6 +267,59 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
               style={{ marginTop: '4px' }}
             >
               ✓ Đã bóc link SP: {productInfo.cleanUrl}
+              {productInfo.shopId ? ` • Shop #${productInfo.shopId}` : ''}
+              {isResolvingLink ? ' (Đang giải mã link rút gọn...)' : ''}
+            </div>
+          )}
+
+          {autoProductVouchers.length > 0 && (
+            <div
+              className="auto-voucher-box"
+              data-testid="form-auto-voucher-list"
+              style={{ marginTop: '6px' }}
+            >
+              <div className="auto-voucher-box-header">
+                <span>
+                  🎯 Tự động kéo {autoProductVouchers.length} Voucher áp dụng cho SP này (Bấm chọn
+                  hoặc Dùng luôn):
+                </span>
+              </div>
+              <div className="auto-voucher-list">
+                {autoProductVouchers.map((v) => {
+                  const isPicked =
+                    voucherRaw === v.voucherUrl && voucherNote === v.voucherNote;
+                  return (
+                    <div
+                      key={v.id}
+                      className={`auto-voucher-item ${isPicked ? 'is-picked' : ''}`}
+                      data-testid={`form-auto-voucher-${v.id}`}
+                    >
+                      <div className="auto-voucher-info">
+                        <span className="auto-voucher-badge">{v.badge}</span>
+                        <span className="auto-voucher-note">{v.voucherNote}</span>
+                      </div>
+                      <div className="auto-voucher-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          data-testid={`select-auto-voucher-${v.id}`}
+                          onClick={() => handleApplyAutoVoucher(v)}
+                        >
+                          {isPicked ? '✓ Đã chọn' : '+ Chọn mã này'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          data-testid={`use-now-auto-voucher-${v.id}`}
+                          onClick={() => handleDirectUseAutoVoucher(v)}
+                        >
+                          ⚡ Dùng luôn
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

@@ -29,6 +29,7 @@ import {
   syncServerTime,
 } from './lib/timeSync';
 import type {
+  AutoProductVoucherItem,
   DealRunbookItem,
   EvaluatedChannelStack,
   OrderSplitPlan,
@@ -327,6 +328,38 @@ export function App() {
     });
   };
 
+  const handleQuickAddAutoVoucher = (v: AutoProductVoucherItem) => {
+    const deal: DealRunbookItem = {
+      id: makeId(),
+      slotTime: v.slotTime,
+      targetEpochMs: getNextDropEpochMs(v.slotTime),
+      title: v.title,
+      itemsSummary: v.productUrl
+        ? v.title
+        : 'Tick sẵn món cần mua — Chọn mã đã lưu trong Ví Voucher',
+      voucherCode: v.voucherCode || '',
+      voucherNote: v.voucherNote,
+      paymentMethod: v.paymentMethod || 'ShopeePay',
+      productUrl: v.productUrl || undefined,
+      voucherUrl: v.voucherUrl || undefined,
+      strikeMode: v.strikeMode,
+      shopeeUrl: v.productUrl || v.voucherUrl || 'https://shopee.vn/m/ma-giam-gia',
+      checklist: emptyChecklist(),
+      completed: false,
+    };
+    setItems((prev) => [deal, ...prev]);
+    setActiveId(deal.id);
+    setTab('runbook');
+  };
+
+  const handleDirectUseAutoVoucher = async (v: AutoProductVoucherItem) => {
+    await copyAndLaunchShopee({
+      voucherCode: v.voucherCode || undefined,
+      targetUrl: v.productUrl || v.voucherUrl || 'https://shopee.vn/m/ma-giam-gia',
+      mode: openMode,
+    });
+  };
+
   const handleSelectOrCreateSlot = (slotTime: string, campaignTitle: string, tip: string) => {
     const existing = items.find((i) => !i.completed && i.slotTime === slotTime);
     if (existing) {
@@ -550,6 +583,8 @@ export function App() {
           onOpenProduct={(i) => void handleOpenProduct(i)}
           onOpenVoucher={(i) => void handleOpenVoucher(i)}
           onUpdateDealLinks={handleUpdateDealLinks}
+          onQuickAddAutoVoucher={handleQuickAddAutoVoucher}
+          onDirectUseAutoVoucher={(v) => void handleDirectUseAutoVoucher(v)}
           onToggleCompleted={handleToggleCompleted}
           onDelete={handleDelete}
         />
@@ -561,10 +596,16 @@ export function App() {
           onSelectOrCreateSlot={handleSelectOrCreateSlot}
           onImportParsedDeals={handleImportParsedDeals}
           onCreateChannelReminder={handleCreateChannelReminder}
+          onQuickAddAutoVoucher={handleQuickAddAutoVoucher}
         />
       )}
 
-      {tab === 'add' && <RunbookForm onAddDeal={handleAddDeal} />}
+      {tab === 'add' && (
+        <RunbookForm
+          onAddDeal={handleAddDeal}
+          onDirectUseVoucher={(v) => void handleDirectUseAutoVoucher(v)}
+        />
+      )}
 
       {tab === 'optimizer' && (
         <CartOptimizer

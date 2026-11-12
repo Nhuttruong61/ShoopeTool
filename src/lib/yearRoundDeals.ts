@@ -1,14 +1,16 @@
 import type {
+  AutoProductVoucherItem,
   ChannelStackComparison,
   ChannelStackInput,
   ChannelVoucherSpec,
   EvaluatedChannelStack,
+  ExtractedShopeeLink,
   ParsedDealCandidate,
   SaleCampaignEvent,
   ShoppingChannel,
   VoucherHubShortcut,
 } from '../types/contracts';
-import { extractShopeeLinkInfo } from './clipboard';
+import { buildShopeeShopUrl, extractShopeeLinkInfo } from './clipboard';
 import { formatVnd } from './optimizer';
 
 const VN_OFFSET_MS = 7 * 3600_000;
@@ -1120,3 +1122,171 @@ export function compareChannelStacks(input: ChannelStackInput): ChannelStackComp
     summaryTip,
   };
 }
+
+const STANDARD_PEAK_SLOTS = ['00:00', '09:00', '12:00', '15:00', '18:00', '21:00'] as const;
+
+/**
+ * Returns the next upcoming Shopee peak drop slot in Vietnam time (UTC+7).
+ */
+export function getNextUpcomingSlotTime(nowEpochMs = Date.now()): string {
+  const vnDate = new Date(nowEpochMs + VN_OFFSET_MS);
+  const currentMinutes = vnDate.getUTCHours() * 60 + vnDate.getUTCMinutes();
+
+  for (const slot of STANDARD_PEAK_SLOTS) {
+    const [h, m] = slot.split(':').map(Number);
+    if (h * 60 + m > currentMinutes) {
+      return slot;
+    }
+  }
+  return '00:00';
+}
+
+function detectDiscountPercentFromText(rawText: string, fallbackPercent = 35): number {
+  const match = /(?:giảm\s*|voucher\s*|mã\s*)?(\d{1,2})\s*%/iu.exec(rawText);
+  if (match && match[1]) {
+    const pct = Number(match[1]);
+    if (pct >= 5 && pct <= 99) {
+      return pct;
+    }
+  }
+  return fallbackPercent;
+}
+
+/**
+ * Automatically builds a ready-to-use list of Shopee vouchers for a pasted Product Link
+ * (or returns today's active campaign voucher list when no product link is attached yet).
+ * When a product link is provided, every voucher item is automatically bound to `productUrl`
+ * and (when `shopId` is known) links Shop Vouchers directly to `https://shopee.vn/shop/<shopId>`.
+ */
+export function buildProductVoucherSuggestions(
+  rawProductInput = '',
+  resolvedOverride?: ExtractedShopeeLink | null,
+  defaultSlotTime?: string,
+  nowEpochMs = Date.now(),
+): AutoProductVoucherItem[] {
+  const baseInfo = extractShopeeLinkInfo(rawProductInput);
+  const effectiveInfo: ExtractedShopeeLink = resolvedOverride?.cleanUrl
+    ? {
+        ...baseInfo,
+        ...resolvedOverride,
+        extractedTitle: resolvedOverride.extractedTitle ?? baseInfo.extractedTitle,
+      }
+    : baseInfo;
+
+  const cleanProductUrl = effectiveInfo.cleanUrl ?? '';
+  const shopId = effectiveInfo.shopId;
+  const itemId = effectiveInfo.itemId;
+  const productLabel = effectiveInfo.extractedTitle
+    ? capitalizeFirst(effectiveInfo.extractedTitle)
+    : cleanProductUrl
+      ? 'Sản phẩm đã gắn link'
+      : 'Đơn hàng Shopee';
+
+  const lineWithoutUrls = stripUrlsFromText(rawProductInput);
+  const detectedSlot =
+    extractSlotTimeFromText(lineWithoutUrls) ??
+    defaultSlotTime ??
+    getNextUpcomingSlotTime(nowEpochMs);
+  const detectedCode = extractVoucherCodeFromLine(rawProductInput) ?? '';
+  const detectedPercent = detectDiscountPercentFromText(lineWithoutUrls, 35);
+  const detectedPayment = extractPaymentMethod(lineWithoutUrls);
+  const paymentMethod = detectedPayment !== 'Mọi TT' ? detectedPayment : 'ShopeePay';
+
+  const shopVoucherTargetUrl = shopId
+    ? buildShopeeShopUrl(shopId)
+    : cleanProductUrl || 'https://shopee.vn/m/ma-giam-gia';
+
+  const shopTag = shopId ? ` (Shop #${shopId})` : '';
+
+  return [
+    {
+      id: 'auto-voucher-shop-flash',
+      badge: `⚡ Mã Shop Giảm ${detectedPercent}%`,
+      title: `${productLabel} — Voucher Shop Giảm ${detectedPercent}%`,
+      voucherNote: `Săn Voucher Shop tung giảm ${detectedPercent}% cho đơn hàng${shopTag} — Bấm mở thẳng SP/Shop dùng luôn đúng khung ${detectedSlot}`,
+      slotTime: detectedSlot,
+      strikeMode: 'flash-product',
+      productUrl: cleanProductUrl,
+      voucherUrl: shopVoucherTargetUrl,
+      voucherCode: detectedCode,
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+    {
+      id: 'auto-voucher-shop-wallet',
+      badge: '🏪 Kho Mã Gian Hàng',
+      title: `${productLabel} — Lưu Mã Gian Hàng Shop${shopTag}`,
+      voucherNote: `Mở thẳng Gian hàng${shopTag} lưu trước toàn bộ Mã Shop (Giảm 10%–35%), chồng Tầng 1 cùng Mã Sàn`,
+      slotTime: detectedSlot,
+      strikeMode: 'checkout-wait',
+      productUrl: cleanProductUrl,
+      voucherUrl: shopVoucherTargetUrl,
+      voucherCode: '',
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+    {
+      id: 'auto-voucher-xtra',
+      badge: '🏷️ Voucher Xtra 15%–25%',
+      title: `${productLabel} — Áp Mã Voucher Xtra 15%–25%`,
+      voucherNote:
+        'Lưu mã tại Trạm Voucher Xtra (tối đa 100K–500K), áp chồng Tầng 2 cùng Mã Shop lúc thanh toán',
+      slotTime: detectedSlot,
+      strikeMode: 'checkout-wait',
+      productUrl: cleanProductUrl,
+      voucherUrl: 'https://shopee.vn/m/voucher-xtra',
+      voucherCode: '',
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+    {
+      id: 'auto-voucher-video',
+      badge: '🎬 Mã Video 20%–50%',
+      title: `${productLabel} — Săn Mã Shopee Video 20%–50%`,
+      voucherNote:
+        'Lưu mã Shopee Video & thêm sản phẩm từ Giỏ vàng trên Video của Shop để giảm sâu 20%–50%',
+      slotTime: detectedSlot,
+      strikeMode: 'checkout-wait',
+      productUrl: cleanProductUrl,
+      voucherUrl: 'https://shopee.vn/m/shopee-video',
+      voucherCode: '',
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+    {
+      id: 'auto-voucher-live',
+      badge: '📺 Mã Live 15%–30%',
+      title: `${productLabel} — Săn Mã Shopee Live 15%–30%`,
+      voucherNote:
+        'Lưu mã Shopee Live & thêm sản phẩm từ Giỏ cam Livestream (mạnh nhất khung 12:00 & 20:00–22:00)',
+      slotTime: detectedSlot,
+      strikeMode: 'checkout-wait',
+      productUrl: cleanProductUrl,
+      voucherUrl: 'https://shopee.vn/m/shopee-live',
+      voucherCode: '',
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+    {
+      id: 'auto-voucher-platform-freeship',
+      badge: '🔥 Toàn Sàn + Freeship 0đ',
+      title: `${productLabel} — Mã Toàn Sàn & Freeship 0đ (${detectedSlot})`,
+      voucherNote:
+        'Lưu sẵn Mã Toàn Sàn & Freeship Xtra 0đ trong Ví Voucher, đứng chờ màn Thanh toán đúng mốc :00',
+      slotTime: detectedSlot,
+      strikeMode: 'checkout-wait',
+      productUrl: cleanProductUrl,
+      voucherUrl: 'https://shopee.vn/m/ma-giam-gia',
+      voucherCode: '',
+      paymentMethod,
+      shopId,
+      itemId,
+    },
+  ];
+}
+

@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { extractShopeeLinkInfo } from '../lib/clipboard';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  copyAndLaunchShopee,
+  extractShopeeLinkInfo,
+  resolveShopeeShortLink,
+} from '../lib/clipboard';
+import { buildProductVoucherSuggestions } from '../lib/yearRoundDeals';
 import type {
+  AutoProductVoucherItem,
   DealRunbookItem,
+  ExtractedShopeeLink,
   RunbookChecklist,
   StrikeMode,
 } from '../types/contracts';
@@ -10,6 +17,7 @@ export interface DealLinksPatch {
   productUrl?: string;
   voucherUrl?: string;
   voucherCode?: string;
+  voucherNote?: string;
   strikeMode?: StrikeMode;
   title?: string;
   itemsSummary?: string;
@@ -28,6 +36,8 @@ export interface RunbookListProps {
   onOpenProduct?: (item: DealRunbookItem) => void;
   onOpenVoucher?: (item: DealRunbookItem) => void;
   onUpdateDealLinks?: (id: string, patch: DealLinksPatch) => void;
+  onQuickAddAutoVoucher?: (voucher: AutoProductVoucherItem) => void;
+  onDirectUseAutoVoucher?: (voucher: AutoProductVoucherItem) => void;
   onToggleCompleted: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -87,12 +97,98 @@ export const RunbookList: React.FC<RunbookListProps> = ({
   onOpenProduct,
   onOpenVoucher,
   onUpdateDealLinks,
+  onQuickAddAutoVoucher,
+  onDirectUseAutoVoucher,
   onToggleCompleted,
   onDelete,
 }) => {
   const [attachDrafts, setAttachDrafts] = useState<
     Record<string, AttachDraftState>
   >({});
+  const [quickProductRaw, setQuickProductRaw] = useState<string>('');
+  const [quickResolvedInfo, setQuickResolvedInfo] =
+    useState<ExtractedShopeeLink | null>(null);
+  const [isQuickResolving, setIsQuickResolving] = useState<boolean>(false);
+  const [showDailyAutoVouchers, setShowDailyAutoVouchers] =
+    useState<boolean>(false);
+
+  const quickSyncInfo = useMemo(
+    () => extractShopeeLinkInfo(quickProductRaw),
+    [quickProductRaw],
+  );
+  const effectiveQuickInfo = useMemo<ExtractedShopeeLink>(() => {
+    if (quickResolvedInfo && quickResolvedInfo.cleanUrl) {
+      return {
+        ...quickSyncInfo,
+        ...quickResolvedInfo,
+        extractedTitle:
+          quickResolvedInfo.extractedTitle ?? quickSyncInfo.extractedTitle,
+      };
+    }
+    return quickSyncInfo;
+  }, [quickSyncInfo, quickResolvedInfo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (quickSyncInfo.kind !== 'shortlink' || !quickSyncInfo.cleanUrl) {
+      setQuickResolvedInfo(null);
+      setIsQuickResolving(false);
+      return;
+    }
+
+    setIsQuickResolving(true);
+    void resolveShopeeShortLink(quickProductRaw).then((resolved) => {
+      if (cancelled) return;
+      setIsQuickResolving(false);
+      if (resolved.cleanUrl && resolved.cleanUrl !== quickSyncInfo.cleanUrl) {
+        setQuickResolvedInfo(resolved);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quickProductRaw, quickSyncInfo.kind, quickSyncInfo.cleanUrl]);
+
+  const activeSlotTime = useMemo(() => {
+    const activeItem = items.find((i) => i.id === activeId);
+    return activeItem?.slotTime;
+  }, [items, activeId]);
+
+  const quickAutoVouchers = useMemo(() => {
+    if (!effectiveQuickInfo.cleanUrl && !showDailyAutoVouchers) {
+      return [];
+    }
+    return buildProductVoucherSuggestions(
+      quickProductRaw,
+      effectiveQuickInfo,
+      activeSlotTime,
+    );
+  }, [
+    quickProductRaw,
+    effectiveQuickInfo,
+    activeSlotTime,
+    showDailyAutoVouchers,
+  ]);
+
+  const handleDirectUse = (v: AutoProductVoucherItem) => {
+    if (onDirectUseAutoVoucher) {
+      onDirectUseAutoVoucher(v);
+      return;
+    }
+    void copyAndLaunchShopee({
+      voucherCode: v.voucherCode || undefined,
+      targetUrl: v.productUrl || v.voucherUrl,
+    });
+  };
+
+  const handleQuickAdd = (v: AutoProductVoucherItem) => {
+    if (onQuickAddAutoVoucher) {
+      onQuickAddAutoVoucher(v);
+      setQuickProductRaw('');
+      setQuickResolvedInfo(null);
+    }
+  };
 
   const handleToggleAttach = (item: DealRunbookItem) => {
     setAttachDrafts((prev) => {
@@ -180,6 +276,120 @@ export const RunbookList: React.FC<RunbookListProps> = ({
 
   return (
     <section className="runbook-container" aria-label="Danh sách kịch bản săn mã">
+      {/* Quick Auto-Pull Product Voucher Bar */}
+      <div
+        className="quick-product-voucher-bar"
+        data-testid="quick-product-voucher-bar"
+      >
+        <div className="quick-product-voucher-top">
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div className="quick-product-voucher-title">
+              ⚡ Gắn Link SP → Tự Động Kéo Danh Sách Voucher &amp; Dùng Luôn
+            </div>
+            <input
+              type="text"
+              data-testid="quick-product-link-input"
+              className="text-input"
+              placeholder="Dán link SP Shopee (vn.shp.ee / s.shopee.vn / shopee.vn) để tự kéo danh sách Voucher..."
+              value={quickProductRaw}
+              onChange={(e) => setQuickProductRaw(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
+            {quickProductRaw && (
+              <button
+                type="button"
+                className="btn btn-danger-ghost btn-sm"
+                onClick={() => {
+                  setQuickProductRaw('');
+                  setQuickResolvedInfo(null);
+                }}
+              >
+                Xóa
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="toggle-daily-auto-vouchers-btn"
+              className={`btn btn-sm ${
+                showDailyAutoVouchers || Boolean(effectiveQuickInfo.cleanUrl)
+                  ? 'btn-active-toggle'
+                  : 'btn-outline-accent'
+              }`}
+              onClick={() => setShowDailyAutoVouchers((prev) => !prev)}
+            >
+              {showDailyAutoVouchers || Boolean(effectiveQuickInfo.cleanUrl)
+                ? 'Ẩn DS Voucher'
+                : '🎯 Kéo 6 Voucher Hôm Nay'}
+            </button>
+          </div>
+        </div>
+
+        {effectiveQuickInfo.cleanUrl && (
+          <div
+            className="link-preview-badge"
+            data-testid="quick-product-resolved-badge"
+            style={{ marginTop: '4px' }}
+          >
+            ✓ Đã nhận SP: {effectiveQuickInfo.extractedTitle || effectiveQuickInfo.cleanUrl}
+            {effectiveQuickInfo.shopId ? ` • Shop #${effectiveQuickInfo.shopId}` : ''}
+            {isQuickResolving ? ' (Đang giải mã link rút gọn...)' : ''}
+          </div>
+        )}
+
+        {quickAutoVouchers.length > 0 && (
+          <div
+            className="auto-voucher-box"
+            data-testid="quick-auto-voucher-list"
+            style={{ marginTop: '6px' }}
+          >
+            <div className="auto-voucher-box-header">
+              <span>
+                🎟️ Danh sách {quickAutoVouchers.length} Voucher tự động kéo{' '}
+                {effectiveQuickInfo.cleanUrl
+                  ? 'cho Sản phẩm này'
+                  : 'theo Khung giờ hôm nay'}
+                :
+              </span>
+            </div>
+            <div className="auto-voucher-list">
+              {quickAutoVouchers.map((v) => (
+                <div
+                  key={v.id}
+                  className="auto-voucher-item"
+                  data-testid={`quick-auto-voucher-${v.id}`}
+                >
+                  <div className="auto-voucher-info">
+                    <span className="auto-voucher-badge">{v.badge}</span>
+                    <span className="auto-voucher-note">{v.voucherNote}</span>
+                  </div>
+                  <div className="auto-voucher-actions">
+                    {onQuickAddAutoVoucher && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        data-testid={`quick-add-voucher-${v.id}`}
+                        onClick={() => handleQuickAdd(v)}
+                      >
+                        + Gắn vào Ca Săn
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      data-testid={`quick-use-voucher-${v.id}`}
+                      onClick={() => handleDirectUse(v)}
+                    >
+                      ⚡ Dùng luôn
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="runbook-header-compact">
         <h2 className="section-title" style={{ fontSize: '0.92rem', margin: 0 }}>
           Kịch Bản Săn Mã ({items.length} ca)
@@ -423,15 +633,61 @@ export const RunbookList: React.FC<RunbookListProps> = ({
                   </div>
 
                   {draftProductInfo?.cleanUrl && (
-                    <div
-                      className="link-preview-badge"
-                      title={draftProductInfo.cleanUrl}
-                    >
-                      ✓ Đã bóc link SP: {draftProductInfo.cleanUrl}
-                      {draftProductInfo.extractedTitle
-                        ? ` (${draftProductInfo.extractedTitle})`
-                        : ''}
-                    </div>
+                    <>
+                      <div
+                        className="link-preview-badge"
+                        title={draftProductInfo.cleanUrl}
+                      >
+                        ✓ Đã bóc link SP: {draftProductInfo.cleanUrl}
+                        {draftProductInfo.extractedTitle
+                          ? ` (${draftProductInfo.extractedTitle})`
+                          : ''}
+                        {draftProductInfo.shopId
+                          ? ` • Shop #${draftProductInfo.shopId}`
+                          : ''}
+                      </div>
+
+                      <div
+                        className="auto-voucher-inline-chips"
+                        data-testid={`inline-auto-vouchers-${item.id}`}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: '#6ee7b7',
+                            fontWeight: 700,
+                          }}
+                        >
+                          🎯 Chọn nhanh Voucher cho SP này:
+                        </span>
+                        {buildProductVoucherSuggestions(
+                          draft.productRaw,
+                          draftProductInfo,
+                          item.slotTime,
+                        ).map((sug) => (
+                          <button
+                            key={sug.id}
+                            type="button"
+                            className={`slot-chip ${
+                              draft.voucherRaw === sug.voucherUrl &&
+                              draft.strikeMode === sug.strikeMode
+                                ? 'active'
+                                : ''
+                            }`}
+                            data-testid={`inline-pick-voucher-${item.id}-${sug.id}`}
+                            onClick={() =>
+                              handleUpdateDraft(item.id, {
+                                voucherRaw: sug.voucherUrl,
+                                strikeMode: sug.strikeMode,
+                                codeRaw: sug.voucherCode || draft.codeRaw,
+                              })
+                            }
+                          >
+                            {sug.badge}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
 
                   <div className="inline-attach-grid">

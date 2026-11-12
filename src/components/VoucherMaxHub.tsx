@@ -1,18 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { extractShopeeLinkInfo, resolveShopeeShortLink } from '../lib/clipboard';
 import { formatVnd } from '../lib/optimizer';
 import {
   DEFAULT_STACK_INPUT,
   OFFICIAL_VOUCHER_HUBS,
   SAMPLE_DEAL_PASTE_TEXT,
+  buildProductVoucherSuggestions,
   compareChannelStacks,
   getUpcomingSaleRadar,
   parseDealTextPaste,
 } from '../lib/yearRoundDeals';
 import type {
+  AutoProductVoucherItem,
   ChannelStackInput,
   ChannelVoucherSpec,
   DiscountType,
   EvaluatedChannelStack,
+  ExtractedShopeeLink,
   ParsedDealCandidate,
   VoucherHubCategory,
 } from '../types/contracts';
@@ -22,6 +26,7 @@ export interface VoucherMaxHubProps {
   onSelectOrCreateSlot: (slotTime: string, campaignTitle: string, tip: string) => void;
   onImportParsedDeals: (deals: ParsedDealCandidate[]) => void;
   onCreateChannelReminder: (evaluation: EvaluatedChannelStack, slotTime: string) => void;
+  onQuickAddAutoVoucher?: (voucher: AutoProductVoucherItem) => void;
 }
 
 const HUB_CATEGORY_FILTERS: ReadonlyArray<{
@@ -55,7 +60,52 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
   onSelectOrCreateSlot,
   onImportParsedDeals,
   onCreateChannelReminder,
+  onQuickAddAutoVoucher,
 }) => {
+  // 0. Auto-pulled Daily & Product Voucher List (always populated on load!)
+  const [hubProductRaw, setHubProductRaw] = useState<string>('');
+  const [hubResolvedInfo, setHubResolvedInfo] = useState<ExtractedShopeeLink | null>(null);
+  const [isHubResolving, setIsHubResolving] = useState<boolean>(false);
+
+  const hubSyncInfo = useMemo(() => extractShopeeLinkInfo(hubProductRaw), [hubProductRaw]);
+  const effectiveHubInfo = useMemo<ExtractedShopeeLink>(() => {
+    if (hubResolvedInfo && hubResolvedInfo.cleanUrl) {
+      return {
+        ...hubSyncInfo,
+        ...hubResolvedInfo,
+        extractedTitle: hubResolvedInfo.extractedTitle ?? hubSyncInfo.extractedTitle,
+      };
+    }
+    return hubSyncInfo;
+  }, [hubSyncInfo, hubResolvedInfo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (hubSyncInfo.kind !== 'shortlink' || !hubSyncInfo.cleanUrl) {
+      setHubResolvedInfo(null);
+      setIsHubResolving(false);
+      return;
+    }
+
+    setIsHubResolving(true);
+    void resolveShopeeShortLink(hubProductRaw).then((resolved) => {
+      if (cancelled) return;
+      setIsHubResolving(false);
+      if (resolved.cleanUrl && resolved.cleanUrl !== hubSyncInfo.cleanUrl) {
+        setHubResolvedInfo(resolved);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hubProductRaw, hubSyncInfo.kind, hubSyncInfo.cleanUrl]);
+
+  const autoVoucherFeed = useMemo(
+    () => buildProductVoucherSuggestions(hubProductRaw, effectiveHubInfo),
+    [hubProductRaw, effectiveHubInfo],
+  );
+
   // 1. 365-Day Sale Radar
   const radarEvents = useMemo(() => getUpcomingSaleRadar(), []);
 
@@ -106,6 +156,98 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
 
   return (
     <div className="maxhub-stack" data-testid="voucher-max-hub">
+      {/* SECTION 0: AUTO-PULLED VOUCHER LIST FOR PRODUCT & TODAY'S SLOTS */}
+      <section
+        className="section-card"
+        aria-label="Danh Sách Voucher Tự Động Hôm Nay và Theo Sản Phẩm"
+        data-testid="hub-auto-voucher-section"
+      >
+        <div className="section-header">
+          <div>
+            <h2 className="section-title">
+              🎟️ Danh Sách Voucher Tự Động Hôm Nay &amp; Theo Link SP
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Đã tự động kéo {autoVoucherFeed.length} nhóm Voucher đang mở hôm nay — Dán thêm link
+              SP để tự lấy Mã Gian Hàng Shop (#ShopID) &amp; bấm Dùng luôn!
+            </p>
+          </div>
+        </div>
+
+        <label className="field-label" htmlFor="hub-product-link-input">
+          <span>📦 Gắn Link Sản Phẩm (tùy chọn — để tự bắt Mã Shop 35% &amp; gắn vào SP):</span>
+          <input
+            id="hub-product-link-input"
+            data-testid="hub-product-link-input"
+            type="text"
+            className="text-input"
+            placeholder="Dán link SP Shopee (vn.shp.ee / s.shopee.vn / shopee.vn)..."
+            value={hubProductRaw}
+            onChange={(e) => setHubProductRaw(e.target.value)}
+          />
+        </label>
+
+        {effectiveHubInfo.cleanUrl && (
+          <div
+            className="link-preview-badge"
+            data-testid="hub-product-resolved-badge"
+            style={{ marginTop: '4px' }}
+          >
+            ✓ Đã gắn SP: {effectiveHubInfo.extractedTitle || effectiveHubInfo.cleanUrl}
+            {effectiveHubInfo.shopId ? ` • Shop #${effectiveHubInfo.shopId}` : ''}
+            {isHubResolving ? ' (Đang giải mã link rút gọn...)' : ''}
+          </div>
+        )}
+
+        <div
+          className="auto-voucher-list"
+          data-testid="hub-auto-voucher-list"
+          style={{ marginTop: '8px' }}
+        >
+          {autoVoucherFeed.map((v) => (
+            <div
+              key={v.id}
+              className="auto-voucher-item"
+              data-testid={`hub-auto-voucher-${v.id}`}
+            >
+              <div className="auto-voucher-info">
+                <span className="auto-voucher-badge">{v.badge}</span>
+                <span className="auto-voucher-note">{v.voucherNote}</span>
+              </div>
+              <div className="auto-voucher-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  data-testid={`hub-add-auto-voucher-${v.id}`}
+                  onClick={() => {
+                    if (onQuickAddAutoVoucher) {
+                      onQuickAddAutoVoucher(v);
+                    } else {
+                      onSelectOrCreateSlot(v.slotTime, v.title, v.voucherNote);
+                    }
+                  }}
+                >
+                  + Gắn vào Ca Săn
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  data-testid={`hub-use-auto-voucher-${v.id}`}
+                  onClick={() =>
+                    onOpenShopeeUrl(
+                      v.productUrl || v.voucherUrl,
+                      v.voucherCode || undefined,
+                    )
+                  }
+                >
+                  ⚡ Dùng luôn
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* SECTION 1: 365-DAY SALE RADAR & REAL VOUCHER WORKFLOW EXPLANATION */}
       <section className="section-card" aria-label="Lịch Sale và Khung Giờ Thực Tế 365 Ngày">
         <div className="section-header">

@@ -94,6 +94,22 @@ export interface ExtractedShopeeLink {
   kind: ShopeeLinkKind;
   shopId?: string;
   itemId?: string;
+  resolvedFromShortlink?: boolean;
+}
+
+export interface AutoProductVoucherItem {
+  id: string;
+  badge: string;
+  title: string;
+  voucherNote: string;
+  slotTime: string;
+  strikeMode: StrikeMode;
+  productUrl: string;
+  voucherUrl: string;
+  voucherCode: string;
+  paymentMethod: string;
+  shopId?: string;
+  itemId?: string;
 }
 
 export interface RunbookChecklist {

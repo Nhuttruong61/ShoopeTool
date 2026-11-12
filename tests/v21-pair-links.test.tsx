@@ -266,4 +266,37 @@ describe('v2.1 Paired Product + Voucher 1-Tap Strike End-to-End Integration', ()
       'https://shopee.vn/Chuot-Gaming-Sieu-Nhe-i.88888.99999',
     );
   });
+
+  it('auto-pulls the 6-item voucher list (including Shop 35% + Shop ID link) when pasting a product link and supports 1-tap Dùng luôn or Gắn vào Ca Săn', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    render(<App />);
+
+    // On main Runbook screen, paste a product link with "giảm 35%"
+    const quickInput = screen.getByTestId('quick-product-link-input');
+    fireEvent.change(quickInput, {
+      target: {
+        value:
+          'Áo khoác chống nắng UV giảm 35% https://shopee.vn/Ao-Khoac-UV-i.123456.654321',
+      },
+    });
+
+    // Automatically pulls the 6-voucher list without needing any extra click
+    const quickList = screen.getByTestId('quick-auto-voucher-list');
+    expect(quickList).toBeInTheDocument();
+    expect(within(quickList).getByText('⚡ Mã Shop Giảm 35%')).toBeInTheDocument();
+    expect(within(quickList).getByText('🏪 Kho Mã Gian Hàng')).toBeInTheDocument();
+    expect(within(quickList).getByText('🏷️ Voucher Xtra 15%–25%')).toBeInTheDocument();
+
+    // Tapping "⚡ Dùng luôn" on Shop 35% voucher launches the product URL directly
+    fireEvent.click(screen.getByTestId('quick-use-voucher-auto-voucher-shop-flash'));
+    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+    expect(openSpy.mock.calls[0][0]).toBe('https://shopee.vn/Ao-Khoac-UV-i.123456.654321');
+
+    // Tapping "+ Gắn vào Ca Săn" adds the paired product + shop voucher deal to the Runbook
+    fireEvent.click(screen.getByTestId('quick-add-voucher-auto-voucher-shop-flash'));
+    const deals = readStoredDeals();
+    expect(deals[0].productUrl).toBe('https://shopee.vn/Ao-Khoac-UV-i.123456.654321');
+    expect(deals[0].voucherUrl).toBe('https://shopee.vn/shop/123456');
+    expect(deals[0].strikeMode).toBe('flash-product');
+  });
 });

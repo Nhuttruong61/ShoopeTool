@@ -208,6 +208,74 @@ export function extractShopeeLinkInfo(rawInput?: string): ExtractedShopeeLink {
 }
 
 /**
+ * Builds the official Shopee Shop page URL for a given numeric shopId,
+ * where Shop Vouchers (e.g. Giảm 10%–35%) can be claimed directly in the Shopee App.
+ */
+export function buildShopeeShopUrl(shopId: string): string {
+  const cleanShopId = String(shopId ?? '').replace(/\D+/g, '');
+  if (!cleanShopId) {
+    return 'https://shopee.vn/m/ma-giam-gia';
+  }
+  return `https://shopee.vn/shop/${cleanShopId}`;
+}
+
+/**
+ * Resolves a Shopee shortlink (`vn.shp.ee`, `s.shopee.vn`, `shp.ee`, `shope.ee`)
+ * via `/api/resolve-shopee` to extract `shopId`, `itemId`, and readable product title
+ * from the redirected `https://shopee.vn/...-i.<shopId>.<itemId>` URL.
+ * Gracefully falls back to synchronous `extractShopeeLinkInfo` if offline or in local dev.
+ */
+export async function resolveShopeeShortLink(
+  rawInput?: string,
+  fetchImpl: typeof fetch | undefined = typeof fetch !== 'undefined' ? fetch : undefined,
+): Promise<ExtractedShopeeLink> {
+  const baseInfo = extractShopeeLinkInfo(rawInput);
+  if (baseInfo.kind !== 'shortlink' || !baseInfo.cleanUrl || !fetchImpl) {
+    return baseInfo;
+  }
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 3500) : null;
+
+  try {
+    const endpoint = `/api/resolve-shopee?url=${encodeURIComponent(baseInfo.cleanUrl)}`;
+    const response = await fetchImpl(endpoint, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller?.signal,
+    });
+    if (!response.ok) {
+      return baseInfo;
+    }
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      resolvedUrl?: string;
+    };
+    if (!payload?.resolvedUrl || payload.resolvedUrl === baseInfo.cleanUrl) {
+      return baseInfo;
+    }
+
+    const resolvedInfo = extractShopeeLinkInfo(payload.resolvedUrl);
+    if (!resolvedInfo.cleanUrl) {
+      return baseInfo;
+    }
+
+    return {
+      cleanUrl: resolvedInfo.cleanUrl,
+      extractedTitle: baseInfo.extractedTitle ?? resolvedInfo.extractedTitle,
+      kind: resolvedInfo.kind !== 'unknown' ? resolvedInfo.kind : baseInfo.kind,
+      shopId: resolvedInfo.shopId ?? baseInfo.shopId,
+      itemId: resolvedInfo.itemId ?? baseInfo.itemId,
+      resolvedFromShortlink: true,
+    };
+  } catch {
+    return baseInfo;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Detects the current runtime launch platform from userAgent and maxTouchPoints.
  * - 'android': User agent contains Android
  * - 'ios': User agent contains iPhone/iPad/iPod, or iPadOS desktop-class Safari (Macintosh + maxTouchPoints > 1)
