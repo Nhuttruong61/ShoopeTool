@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import type { DealRunbookItem } from '../types/contracts';
+import React, { useMemo, useState } from 'react';
+import { extractShopeeLinkInfo } from '../lib/clipboard';
+import type { DealRunbookItem, StrikeMode } from '../types/contracts';
 
 export type DealRunbookDraft = Omit<
   DealRunbookItem,
@@ -31,7 +32,20 @@ export const DESTINATION_CHIPS: ReadonlyArray<{ label: string; url: string }> = 
   { label: 'Freeship', url: 'https://shopee.vn/m/mien-phi-van-chuyen' },
   { label: 'Shopee Video', url: 'https://shopee.vn/m/shopee-video' },
   { label: 'Shopee Live', url: 'https://shopee.vn/m/shopee-live' },
-  { label: 'Giỏ Hàng', url: 'https://shopee.vn/cart' },
+];
+
+export const STRIKE_MODE_OPTIONS: ReadonlyArray<{
+  value: StrikeMode;
+  label: string;
+}> = [
+  {
+    value: 'checkout-wait',
+    label: '🛒 Đứng chờ ở Thanh toán (Săn mã giới hạn)',
+  },
+  {
+    value: 'flash-product',
+    label: '⚡ Canh nổ giá tại trang SP (Flash Sale)',
+  },
 ];
 
 export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
@@ -41,16 +55,39 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [voucherNote, setVoucherNote] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('ShopeePay');
-  const [shopeeUrl, setShopeeUrl] = useState<string>('');
+  const [productRaw, setProductRaw] = useState<string>('');
+  const [voucherRaw, setVoucherRaw] = useState<string>('');
+  const [strikeMode, setStrikeMode] = useState<StrikeMode>('checkout-wait');
+
+  const productInfo = useMemo(() => extractShopeeLinkInfo(productRaw), [productRaw]);
+  const voucherInfo = useMemo(() => extractShopeeLinkInfo(voucherRaw), [voucherRaw]);
+
+  const handleProductChange = (nextRaw: string) => {
+    setProductRaw(nextRaw);
+    const info = extractShopeeLinkInfo(nextRaw);
+    if (info.extractedTitle) {
+      if (!title.trim()) {
+        setTitle(info.extractedTitle);
+      }
+      if (!itemsSummary.trim()) {
+        setItemsSummary(info.extractedTitle);
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanSlot = slotTime.trim() || '00:00';
-    const cleanTitle = title.trim() || `Ca săn khung ${cleanSlot}`;
-    const cleanItems = itemsSummary.trim() || 'Món đã chọn trong giỏ';
+    const cleanProductUrl = productInfo.cleanUrl ?? undefined;
+    const cleanVoucherUrl = voucherInfo.cleanUrl ?? undefined;
+    const cleanTitle =
+      title.trim() || productInfo.extractedTitle || `Ca săn khung ${cleanSlot}`;
+    const cleanItems =
+      itemsSummary.trim() || productInfo.extractedTitle || 'Món đã chọn trong giỏ';
     const cleanCode = voucherCode.trim().toUpperCase();
     const finalUrl =
-      shopeeUrl.trim() ||
+      cleanProductUrl ||
+      cleanVoucherUrl ||
       (cleanCode ? 'https://shopee.vn/cart' : 'https://shopee.vn/m/ma-giam-gia');
 
     onAddDeal({
@@ -60,6 +97,9 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
       voucherCode: cleanCode,
       voucherNote: voucherNote.trim(),
       paymentMethod,
+      productUrl: cleanProductUrl || undefined,
+      voucherUrl: cleanVoucherUrl || undefined,
+      strikeMode,
       shopeeUrl: finalUrl,
     });
 
@@ -67,7 +107,9 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
     setItemsSummary('');
     setVoucherCode('');
     setVoucherNote('');
-    setShopeeUrl('');
+    setProductRaw('');
+    setVoucherRaw('');
+    setStrikeMode('checkout-wait');
   };
 
   return (
@@ -123,6 +165,105 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
           </label>
         </div>
 
+        {/* Paired Smart Field 1: Product Link / Share Text */}
+        <div>
+          <label className="field-label">
+            <span>📦 Link / Đoạn chia sẻ Sản Phẩm</span>
+            <input
+              type="text"
+              data-testid="product-url-input"
+              className="text-input"
+              placeholder="Dán link hoặc nguyên câu Chia sẻ từ App Shopee (vn.shp.ee / s.shopee.vn)..."
+              value={productRaw}
+              onChange={(e) => handleProductChange(e.target.value)}
+            />
+          </label>
+          {productInfo.cleanUrl && (
+            <div
+              className="link-preview-badge"
+              data-testid="product-link-preview"
+              title={productInfo.cleanUrl}
+              style={{ marginTop: '4px' }}
+            >
+              ✓ Đã bóc link SP: {productInfo.cleanUrl}
+            </div>
+          )}
+        </div>
+
+        {/* Paired Smart Field 2: Voucher Claim Link / Hub */}
+        <div>
+          <label className="field-label">
+            <span>🎟️ Link Lưu Voucher / Kho Mã</span>
+            <input
+              type="text"
+              data-testid="voucher-url-input"
+              className="text-input"
+              placeholder="Dán link lưu voucher (s.shopee.vn / promotionId) hoặc chọn trạm bên dưới..."
+              value={voucherRaw}
+              onChange={(e) => setVoucherRaw(e.target.value)}
+            />
+          </label>
+          <div
+            className="chip-group"
+            role="group"
+            aria-label="Đích đến mẫu"
+            style={{ marginTop: '5px' }}
+          >
+            {DESTINATION_CHIPS.map((chip) => {
+              const isSelected =
+                voucherRaw === chip.url || voucherInfo.cleanUrl === chip.url;
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  className={`slot-chip ${isSelected ? 'active' : ''}`}
+                  onClick={() => setVoucherRaw(chip.url)}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+          {voucherInfo.cleanUrl &&
+            !DESTINATION_CHIPS.some((c) => c.url === voucherInfo.cleanUrl) && (
+              <div
+                className="link-preview-badge"
+                data-testid="voucher-link-preview"
+                title={voucherInfo.cleanUrl}
+                style={{ marginTop: '4px' }}
+              >
+                ✓ Đã bóc link Mã: {voucherInfo.cleanUrl}
+              </div>
+            )}
+        </div>
+
+        {/* Strike Mode Selector */}
+        <div>
+          <span className="field-label" style={{ marginBottom: '4px' }}>
+            ⚡ Chế độ Tác Chiến:
+          </span>
+          <div
+            className="strike-mode-pills"
+            role="group"
+            aria-label="Chế độ tác chiến"
+          >
+            {STRIKE_MODE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                data-testid={`strike-mode-${opt.value}`}
+                aria-pressed={strikeMode === opt.value}
+                className={`strike-mode-pill ${
+                  strikeMode === opt.value ? 'active' : ''
+                }`}
+                onClick={() => setStrikeMode(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="form-row form-row-2">
           <label className="field-label">
             <span>Tên ca săn / Nhãn gợi nhớ</span>
@@ -169,31 +310,6 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
               onChange={(e) => setVoucherNote(e.target.value)}
             />
           </label>
-        </div>
-
-        <div>
-          <span className="field-label" style={{ marginBottom: '4px' }}>
-            Đích đến khi bấm mở Shopee:
-          </span>
-          <div className="chip-group" role="group" aria-label="Đích đến mẫu" style={{ marginBottom: '6px' }}>
-            {DESTINATION_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                className={`slot-chip ${shopeeUrl === chip.url ? 'active' : ''}`}
-                onClick={() => setShopeeUrl(chip.url)}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-          <input
-            type="url"
-            className="text-input"
-            placeholder="Hoặc dán link trang lưu voucher / sản phẩm... (mặc định: Kho mã)"
-            value={shopeeUrl}
-            onChange={(e) => setShopeeUrl(e.target.value)}
-          />
         </div>
 
         <button type="submit" className="btn btn-primary">
