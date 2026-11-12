@@ -1,4 +1,4 @@
-import type { CartItem, DealRunbookItem, VoucherRule } from '../types/contracts';
+import type { CartItem, DealRunbookItem, StrikeMode, VoucherRule } from '../types/contracts';
 import type { OpenModePreference } from './clipboard';
 
 export const STORAGE_KEYS = {
@@ -64,6 +64,8 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherNote: 'Mã lưu sẵn trong Ví Voucher / Banner Toàn Sàn — Mở lượt đúng 00:00:00',
     paymentMethod: 'ShopeePay',
     shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
+    voucherUrl: 'https://shopee.vn/m/ma-giam-gia',
+    strikeMode: 'checkout-wait',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -81,6 +83,8 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherNote: 'Mã lưu Ví Voucher Xtra 15%–20% + Mã Shop — Châm thêm lượt lúc 09:00',
     paymentMethod: 'SPayLater',
     shopeeUrl: 'https://shopee.vn/m/voucher-xtra',
+    voucherUrl: 'https://shopee.vn/m/voucher-xtra',
+    strikeMode: 'checkout-wait',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -98,6 +102,8 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherNote: 'Shopee châm thêm lượt Freeship 0đ, Voucher Xtra & Mã Video khung 12h trưa',
     paymentMethod: 'ShopeePay',
     shopeeUrl: 'https://shopee.vn/m/mien-phi-van-chuyen',
+    voucherUrl: 'https://shopee.vn/m/mien-phi-van-chuyen',
+    strikeMode: 'checkout-wait',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -115,6 +121,8 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherNote: 'Mã độc quyền cho sản phẩm gắn tag Shopee Live (tự có trong Ví Voucher)',
     paymentMethod: 'ShopeePay',
     shopeeUrl: 'https://shopee.vn/m/shopee-live',
+    voucherUrl: 'https://shopee.vn/m/shopee-live',
+    strikeMode: 'checkout-wait',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -262,6 +270,26 @@ export function loadRunbookItems(): DealRunbookItem[] {
       const hasLegacy1111Copy = Boolean(
         presetDefault && (isLegacyMock || /11\/11/.test(item.title)),
       );
+      const rawRecord = item as unknown as Record<string, unknown>;
+      const normalizedProductUrl =
+        typeof rawRecord.productUrl === 'string' && rawRecord.productUrl.trim() !== ''
+          ? rawRecord.productUrl.trim()
+          : undefined;
+      const normalizedVoucherUrl =
+        typeof rawRecord.voucherUrl === 'string' && rawRecord.voucherUrl.trim() !== ''
+          ? rawRecord.voucherUrl.trim()
+          : undefined;
+      const normalizedStrikeMode: StrikeMode | undefined =
+        rawRecord.strikeMode === 'checkout-wait' || rawRecord.strikeMode === 'flash-product'
+          ? rawRecord.strikeMode
+          : undefined;
+      const finalVoucherUrl =
+        normalizedVoucherUrl === undefined &&
+        finalShopeeUrl &&
+        !finalShopeeUrl.includes('/cart')
+          ? finalShopeeUrl
+          : normalizedVoucherUrl;
+
       return {
         ...item,
         title: hasLegacy1111Copy && presetDefault ? presetDefault.title : item.title,
@@ -271,6 +299,9 @@ export function loadRunbookItems(): DealRunbookItem[] {
           hasLegacy1111Copy && presetDefault ? presetDefault.voucherNote : item.voucherNote,
         voucherCode: scrubbedCode,
         shopeeUrl: finalShopeeUrl,
+        productUrl: normalizedProductUrl,
+        voucherUrl: finalVoucherUrl,
+        strikeMode: normalizedStrikeMode,
         checklist: { ...item.checklist },
       };
     });
