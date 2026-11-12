@@ -1,7 +1,25 @@
-import type { ClipboardResult } from '../types/contracts';
+import type {
+  ClipboardResult,
+  ExtractedShopeeLink,
+  ShopeeLinkKind,
+} from '../types/contracts';
 
 const DEFAULT_SHOPEE_WEB_CART = 'https://shopee.vn/cart';
 const DEFAULT_SHOPEE_APP_CART = 'shopeevn://reactPath?path=cart';
+
+const SHORTLINK_HOST_RE = /(^|\.)((vn\.)?shp\.ee|s\.shopee\.vn|shope\.ee)$/i;
+
+const VOUCHER_URL_PATTERNS = [
+  '/voucher/',
+  'promotionid=',
+  'voucher-wallet',
+  '/m/ma-giam-gia',
+  '/m/voucher-xtra',
+  '/m/mien-phi-van-chuyen',
+  '/m/shopeepay',
+  '/m/uu-dai-doi-tac',
+  '/m/shopee-rewards',
+];
 
 export type LaunchPlatform = 'android' | 'ios' | 'desktop';
 export type OpenModePreference = 'auto-app' | 'force-app' | 'web';
@@ -11,6 +29,182 @@ export interface ShopeeLaunchTargets {
   appDeepLink: string;
   iosSchemeUrl: string;
   androidIntentUrl: string;
+}
+
+function cleanPrecedingShareTitle(rawBefore: string): string | null {
+  let text = rawBefore.replace(/\s+/g, ' ').trim();
+  if (!text) {
+    return null;
+  }
+
+  for (let i = 0; i < 4; i++) {
+    const prev = text;
+    text = text
+      .replace(
+        /(?:^|\s+)(?:hãy\s+)?(?:mua\s+ngay|xem\s+ngay|săn\s+ngay)\s+trên\s+shopee(?![\p{L}\p{N}]).*$/iu,
+        '',
+      )
+      .replace(/(?:^|\s+)trên\s+shopee(?![\p{L}\p{N}]).*$/iu, '')
+      .replace(/(?:^|\s+)(?:với\s+giá|giá\s+chỉ|giá\s+ưu\s+đãi|giá\s+bán)(?![\p{L}\p{N}]).*$/iu, '')
+      .replace(/(?:^|\s+)tại(?:\s+shopee|\s+đây)?\s*[:\-–—!.,]*$/iu, '')
+      .trim();
+    if (text === prev) break;
+  }
+
+  text = text.replace(/^[^\p{L}\p{N}[\]()]+/u, '').trim();
+
+  for (let i = 0; i < 3; i++) {
+    const prev = text;
+    text = text
+      .replace(
+        /^(?:hãy\s+xem(?:\s+ngay|\s+sản\s+phẩm)?|xem\s+ngay|mua\s+ngay|săn\s+ngay|sản\s+phẩm)\s*[:\-–—!.,]*$/iu,
+        '',
+      )
+      .replace(
+        /^(?:hãy\s+xem(?:\s+ngay|\s+sản\s+phẩm)?|xem\s+ngay|mua\s+ngay|săn\s+ngay|sản\s+phẩm)(?:\s*[:\-–—]+\s*|\s+)/iu,
+        '',
+      )
+      .replace(/^[^\p{L}\p{N}[\]()]+/u, '')
+      .trim();
+    if (text === prev) break;
+  }
+
+  text = text
+    .replace(/(?:^|\s+)tại\s*[:\-–—!.,]*$/iu, '')
+    .replace(/[\s\-–—|:;,.!?]+$/u, '')
+    .trim();
+
+  return text.length > 0 ? text : null;
+}
+
+function extractSlugTitle(pathname: string): string | null {
+  const slugMatch = /^\/([^/]+)-i\.\d+\.\d+(?:\/|$)/.exec(pathname);
+  if (!slugMatch || !slugMatch[1]) {
+    return null;
+  }
+  let rawSlug = slugMatch[1];
+  try {
+    rawSlug = decodeURIComponent(rawSlug);
+  } catch {
+    // Keep rawSlug if percent-encoding is incomplete
+  }
+  const humanized = rawSlug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return humanized.length > 0 ? humanized : null;
+}
+
+function extractProductIds(input: string): { shopId: string; itemId: string } | null {
+  const patterns = [/-i\.(\d+)\.(\d+)/, /\/product\/(\d+)\/(\d+)/, /\/item\/(\d+)\/(\d+)/];
+  for (const re of patterns) {
+    const match = re.exec(input);
+    if (match && match[1] && match[2]) {
+      return { shopId: match[1], itemId: match[2] };
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts clean URL, optional product title, link classification, and product IDs
+ * from raw Shopee App share text or plain Shopee links/paths.
+ */
+export function extractShopeeLinkInfo(rawInput?: string): ExtractedShopeeLink {
+  if (!rawInput || typeof rawInput !== 'string') {
+    return { cleanUrl: null, extractedTitle: null, kind: 'unknown' };
+  }
+
+  const trimmed = rawInput.trim();
+  if (!trimmed) {
+    return { cleanUrl: null, extractedTitle: null, kind: 'unknown' };
+  }
+
+  let candidateUrl: string | null = null;
+  let rawBefore = '';
+
+  const schemeMatch = /(?:https?:\/\/|shopeevn:\/\/)[^\s"'<>]+/i.exec(rawInput);
+  if (schemeMatch && schemeMatch[0]) {
+    rawBefore = rawInput.slice(0, schemeMatch.index);
+    candidateUrl = schemeMatch[0].replace(/[.,;:!?)>\]]+$/, '');
+  } else if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    const relMatch =
+      /^\/(?:m\/|cart(?:[/?#]|$)|product\/|item\/|voucher\/|[A-Za-z0-9%._-]+-i\.\d+\.\d+)[^\s"'<>]*/i.exec(
+        trimmed,
+      );
+    if (relMatch && relMatch[0]) {
+      const cleanRel = relMatch[0].replace(/[.,;:!?)>\]]+$/, '');
+      candidateUrl = `https://shopee.vn${cleanRel}`;
+    }
+  }
+
+  if (!candidateUrl) {
+    return { cleanUrl: null, extractedTitle: null, kind: 'unknown' };
+  }
+
+  let cleanUrl: string | null = null;
+  let parsedUrl: URL | null = null;
+
+  if (candidateUrl.toLowerCase().startsWith('shopeevn://')) {
+    cleanUrl = candidateUrl;
+  } else {
+    try {
+      const parsed = new URL(candidateUrl);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        parsedUrl = parsed;
+        cleanUrl = candidateUrl;
+      }
+    } catch {
+      cleanUrl = null;
+    }
+  }
+
+  if (!cleanUrl) {
+    return { cleanUrl: null, extractedTitle: null, kind: 'unknown' };
+  }
+
+  let ids = extractProductIds(parsedUrl ? parsedUrl.pathname : cleanUrl);
+  if (!ids && cleanUrl.toLowerCase().startsWith('shopeevn://')) {
+    try {
+      ids = extractProductIds(decodeURIComponent(cleanUrl));
+    } catch {
+      ids = null;
+    }
+  }
+
+  let extractedTitle = cleanPrecedingShareTitle(rawBefore);
+  if (!extractedTitle && parsedUrl) {
+    extractedTitle = extractSlugTitle(parsedUrl.pathname);
+  }
+
+  let kind: ShopeeLinkKind = 'unknown';
+  const lowerUrl = cleanUrl.toLowerCase();
+  const normalizedPathname = parsedUrl ? parsedUrl.pathname.replace(/\/+$/, '') || '/' : '';
+
+  if (parsedUrl && SHORTLINK_HOST_RE.test(parsedUrl.hostname)) {
+    kind = 'shortlink';
+  } else if (ids) {
+    kind = 'product';
+  } else if (
+    normalizedPathname === '/cart' ||
+    lowerUrl === DEFAULT_SHOPEE_APP_CART.toLowerCase()
+  ) {
+    kind = 'cart';
+  } else if (VOUCHER_URL_PATTERNS.some((pattern) => lowerUrl.includes(pattern))) {
+    kind = 'voucher';
+  } else if (lowerUrl.includes('/m/')) {
+    kind = 'hub';
+  }
+
+  const result: ExtractedShopeeLink = {
+    cleanUrl,
+    extractedTitle,
+    kind,
+  };
+
+  if (ids) {
+    result.shopId = ids.shopId;
+    result.itemId = ids.itemId;
+  }
+
+  return result;
 }
 
 /**
@@ -51,21 +245,25 @@ export function detectLaunchPlatform(ua?: string, maxTouchPoints?: number): Laun
  */
 export function buildShopeeLaunchTargets(customUrl?: string): ShopeeLaunchTargets {
   const trimmed = customUrl?.trim();
+  const extracted = trimmed ? extractShopeeLinkInfo(customUrl) : null;
+  const effectiveUrl = extracted?.cleanUrl ?? trimmed;
 
-  if (trimmed && trimmed.toLowerCase().startsWith('shopeevn://')) {
+  if (effectiveUrl && effectiveUrl.toLowerCase().startsWith('shopeevn://')) {
     const encodedFallback = encodeURIComponent(DEFAULT_SHOPEE_WEB_CART);
     return {
       webUrl: DEFAULT_SHOPEE_WEB_CART,
-      appDeepLink: trimmed,
-      iosSchemeUrl: trimmed,
+      appDeepLink: effectiveUrl,
+      iosSchemeUrl: effectiveUrl,
       androidIntentUrl: `intent://home?navigate_url=${encodedFallback}#Intent;scheme=shopeevn;package=com.shopee.vn;S.browser_fallback_url=${encodedFallback};end`,
     };
   }
 
   let webUrl = DEFAULT_SHOPEE_WEB_CART;
-  if (trimmed) {
+  if (effectiveUrl) {
     try {
-      const candidate = trimmed.startsWith('/') ? `https://shopee.vn${trimmed}` : trimmed;
+      const candidate = effectiveUrl.startsWith('/')
+        ? `https://shopee.vn${effectiveUrl}`
+        : effectiveUrl;
       const parsed = new URL(candidate);
       if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
         webUrl = parsed.toString();
@@ -246,6 +444,38 @@ export async function copyAndLaunchShopee(
   }
 
   const platform = detectLaunchPlatform();
+  const extracted = extractShopeeLinkInfo(targetUrl);
+
+  if (extracted.kind === 'shortlink' && extracted.cleanUrl !== null) {
+    const cleanUrl = extracted.cleanUrl;
+    if (mode === 'web' || (mode !== 'force-app' && platform === 'desktop')) {
+      navigateFn(cleanUrl, true);
+      return {
+        copied,
+        launchedUrl: cleanUrl,
+        usedNativeApp: false,
+      };
+    }
+
+    if (mode === 'force-app' && platform === 'android') {
+      const urlWithoutScheme = cleanUrl.replace(/^https?:\/\//i, '');
+      const intentUrl = `intent://${urlWithoutScheme}#Intent;scheme=https;package=com.shopee.vn;S.browser_fallback_url=${encodeURIComponent(cleanUrl)};end`;
+      navigateFn(intentUrl, false);
+      return {
+        copied,
+        launchedUrl: intentUrl,
+        usedNativeApp: true,
+      };
+    }
+
+    navigateFn(cleanUrl, false);
+    return {
+      copied,
+      launchedUrl: cleanUrl,
+      usedNativeApp: true,
+    };
+  }
+
   const targets = buildShopeeLaunchTargets(targetUrl);
 
   if (mode === 'web' || (mode !== 'force-app' && platform === 'desktop')) {

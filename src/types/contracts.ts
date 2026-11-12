@@ -86,6 +86,16 @@ export interface OrderSplitPlan {
   savingsVsSingleOrderVnd: number;
 }
 
+export type StrikeMode = 'checkout-wait' | 'flash-product';
+export type ShopeeLinkKind = 'product' | 'voucher' | 'shortlink' | 'hub' | 'cart' | 'unknown';
+export interface ExtractedShopeeLink {
+  cleanUrl: string | null;
+  extractedTitle: string | null;
+  kind: ShopeeLinkKind;
+  shopId?: string;
+  itemId?: string;
+}
+
 export interface RunbookChecklist {
   itemsTickedInCart: boolean;
   waitingAtCheckoutScreen: boolean;
@@ -102,6 +112,9 @@ export interface DealRunbookItem {
   voucherNote: string;
   paymentMethod: string;
   shopeeUrl?: string;
+  productUrl?: string;
+  voucherUrl?: string;
+  strikeMode?: StrikeMode;
   checklist: RunbookChecklist;
   completed: boolean;
 }
@@ -158,6 +171,8 @@ export interface ParsedDealCandidate {
   voucherNote: string;
   paymentMethod: string;
   rawLine: string;
+  productUrl?: string;
+  voucherUrl?: string;
 }
 
 export type ShoppingChannel = 'normal' | 'video' | 'live';
