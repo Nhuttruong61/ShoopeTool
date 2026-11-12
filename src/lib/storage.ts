@@ -20,6 +20,13 @@ export const LEGACY_FAKE_VOUCHER_CODES = new Set([
   'MINI1111G25K',
 ]);
 
+export const PRESET_HUB_URLS: Record<string, string> = {
+  'slot-0000-toan-san': 'https://shopee.vn/m/ma-giam-gia',
+  'slot-0900-voucher-xtra': 'https://shopee.vn/m/voucher-xtra',
+  'slot-1200-flash-50k': 'https://shopee.vn/m/mien-phi-van-chuyen',
+  'slot-2100-live-1111': 'https://shopee.vn/m/shopee-live',
+};
+
 const VN_OFFSET_MS = 7 * 3600_000;
 const DAY_MS = 24 * 3600_000;
 
@@ -56,7 +63,7 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherCode: '',
     voucherNote: 'Mã lưu sẵn trong Ví Voucher / Banner Toàn Sàn — Mở lượt đúng 00:00:00',
     paymentMethod: 'ShopeePay',
-    shopeeUrl: 'https://shopee.vn/cart',
+    shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -90,7 +97,7 @@ export const DEFAULT_11_11_RUNBOOK: DealRunbookItem[] = [
     voucherCode: '',
     voucherNote: 'Shopee châm thêm lượt Freeship 0đ, Voucher Xtra & Mã Video khung 12h trưa',
     paymentMethod: 'ShopeePay',
-    shopeeUrl: 'https://shopee.vn/m/ma-giam-gia',
+    shopeeUrl: 'https://shopee.vn/m/mien-phi-van-chuyen',
     checklist: {
       itemsTickedInCart: false,
       waitingAtCheckoutScreen: false,
@@ -242,10 +249,28 @@ export function loadRunbookItems(): DealRunbookItem[] {
     }
     const validItems = parsed.filter(isValidRunbookItem).map((item) => {
       const cleanCode = item.voucherCode.trim().toUpperCase();
-      const scrubbedCode = LEGACY_FAKE_VOUCHER_CODES.has(cleanCode) ? '' : item.voucherCode;
+      const isLegacyMock = LEGACY_FAKE_VOUCHER_CODES.has(cleanCode);
+      const scrubbedCode = isLegacyMock ? '' : item.voucherCode;
+      const presetDefault = DEFAULT_11_11_RUNBOOK.find((d) => d.id === item.id);
+      let finalShopeeUrl = item.shopeeUrl;
+      if (
+        (!item.shopeeUrl || item.shopeeUrl === 'https://shopee.vn/cart') &&
+        PRESET_HUB_URLS[item.id]
+      ) {
+        finalShopeeUrl = PRESET_HUB_URLS[item.id];
+      }
+      const hasLegacy1111Copy = Boolean(
+        presetDefault && (isLegacyMock || /11\/11/.test(item.title)),
+      );
       return {
         ...item,
+        title: hasLegacy1111Copy && presetDefault ? presetDefault.title : item.title,
+        itemsSummary:
+          hasLegacy1111Copy && presetDefault ? presetDefault.itemsSummary : item.itemsSummary,
+        voucherNote:
+          hasLegacy1111Copy && presetDefault ? presetDefault.voucherNote : item.voucherNote,
         voucherCode: scrubbedCode,
+        shopeeUrl: finalShopeeUrl,
         checklist: { ...item.checklist },
       };
     });

@@ -25,6 +25,15 @@ export const PAYMENT_METHODS: readonly string[] = [
   'Thẻ/COD',
 ];
 
+export const DESTINATION_CHIPS: ReadonlyArray<{ label: string; url: string }> = [
+  { label: 'Mã Toàn Sàn', url: 'https://shopee.vn/m/ma-giam-gia' },
+  { label: 'Voucher Xtra', url: 'https://shopee.vn/m/voucher-xtra' },
+  { label: 'Freeship', url: 'https://shopee.vn/m/mien-phi-van-chuyen' },
+  { label: 'Shopee Video', url: 'https://shopee.vn/m/shopee-video' },
+  { label: 'Shopee Live', url: 'https://shopee.vn/m/shopee-live' },
+  { label: 'Giỏ Hàng', url: 'https://shopee.vn/cart' },
+];
+
 export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
   const [slotTime, setSlotTime] = useState<string>('00:00');
   const [title, setTitle] = useState<string>('');
@@ -39,15 +48,19 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
     const cleanSlot = slotTime.trim() || '00:00';
     const cleanTitle = title.trim() || `Ca săn khung ${cleanSlot}`;
     const cleanItems = itemsSummary.trim() || 'Món đã chọn trong giỏ';
+    const cleanCode = voucherCode.trim().toUpperCase();
+    const finalUrl =
+      shopeeUrl.trim() ||
+      (cleanCode ? 'https://shopee.vn/cart' : 'https://shopee.vn/m/ma-giam-gia');
 
     onAddDeal({
       slotTime: cleanSlot,
       title: cleanTitle,
       itemsSummary: cleanItems,
-      voucherCode: voucherCode.trim().toUpperCase(),
+      voucherCode: cleanCode,
       voucherNote: voucherNote.trim(),
       paymentMethod,
-      shopeeUrl: shopeeUrl.trim() || undefined,
+      shopeeUrl: finalUrl,
     });
 
     setTitle('');
@@ -65,8 +78,8 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
 
       <form className="form-stack" onSubmit={handleSubmit}>
         <div>
-          <span className="field-label" style={{ marginBottom: '6px' }}>
-            Chọn nhanh khung giờ Flash Sale:
+          <span className="field-label" style={{ marginBottom: '4px' }}>
+            Khung giờ Flash Sale:
           </span>
           <div className="chip-group" role="group" aria-label="Khung giờ mẫu">
             {PRESET_SLOTS.map((preset) => (
@@ -156,6 +169,31 @@ export const RunbookForm: React.FC<RunbookFormProps> = ({ onAddDeal }) => {
               onChange={(e) => setVoucherNote(e.target.value)}
             />
           </label>
+        </div>
+
+        <div>
+          <span className="field-label" style={{ marginBottom: '4px' }}>
+            Đích đến khi bấm mở Shopee:
+          </span>
+          <div className="chip-group" role="group" aria-label="Đích đến mẫu" style={{ marginBottom: '6px' }}>
+            {DESTINATION_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                className={`slot-chip ${shopeeUrl === chip.url ? 'active' : ''}`}
+                onClick={() => setShopeeUrl(chip.url)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="url"
+            className="text-input"
+            placeholder="Hoặc dán link trang lưu voucher / sản phẩm... (mặc định: Kho mã)"
+            value={shopeeUrl}
+            onChange={(e) => setShopeeUrl(e.target.value)}
+          />
         </div>
 
         <button type="submit" className="btn btn-primary">

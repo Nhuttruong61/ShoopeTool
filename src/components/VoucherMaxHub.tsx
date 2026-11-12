@@ -118,21 +118,12 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
         </div>
 
         <div className="real-voucher-explainer" data-testid="real-voucher-explainer">
-          <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: '4px' }}>
-            💡 Sự thật về Mã Giảm Giá Shopee (Tránh nhập mã ảo báo lỗi):
+          <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: '2px', fontSize: '0.76rem' }}>
+            💡 Lưu ý Mã Thật Shopee:
           </div>
-          <ul style={{ margin: 0, paddingLeft: '18px', display: 'grid', gap: '4px' }}>
-            <li>
-              <strong>~90% mã ngon Shopee là Mã Lưu Ví:</strong> Không có ký tự để gõ tay! Bạn phải
-              bấm mở App Shopee lưu sẵn trên Banner / Kho Voucher vào Ví, rồi chờ đúng mốc{' '}
-              <code>00:00 / 09:00 / 12:00 / 21:00</code> tick chọn ở màn Thanh toán.
-            </li>
-            <li>
-              <strong>~10% là Mã Ký Tự Nhập Tay:</strong> Chỉ được Shopee / KOL / Hội nhóm tung ra
-              trước giờ mở mã <strong>15–30 phút</strong>. Khi có bài đăng mã thật, hãy dán vào ô{' '}
-              <strong>Bóc Tách Nhanh</strong> bên dưới!
-            </li>
-          </ul>
+          <p style={{ margin: 0, fontSize: '0.74rem', lineHeight: 1.35, color: 'var(--text-secondary)' }}>
+            <strong>~90% mã là Mã Lưu Ví</strong> (lưu trong Kho Voucher/Banner, chọn lúc thanh toán 0h/9h/12h/21h). <strong>~10% là mã ký tự</strong> nhập tay (dán vào ô Bóc Tách Nhanh bên dưới).
+          </p>
         </div>
 
         <div className="radar-grid">
@@ -247,8 +238,7 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              className="btn btn-secondary"
-              style={{ minHeight: '48px', padding: '8px 12px', fontSize: '0.82rem' }}
+              className="btn btn-secondary btn-sm"
               onClick={handleLoadSamplePaste}
             >
               Xem cú pháp mẫu (chỉ để thử máy bóc tách)
@@ -256,8 +246,7 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
             {pasteText && (
               <button
                 type="button"
-                className="btn btn-danger-ghost"
-                style={{ minHeight: '48px', padding: '8px 12px', fontSize: '0.82rem' }}
+                className="btn btn-danger-ghost btn-sm"
                 onClick={handleClearPaste}
               >
                 Xóa ô dán
@@ -604,7 +593,7 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
           🏆 {stackComparison.summaryTip}
         </div>
 
-        <div className="channel-eval-grid" style={{ marginTop: '12px' }}>
+        <div className="channel-eval-grid" style={{ marginTop: '8px' }}>
           {stackComparison.evaluations.map((ev) => {
             const isBest = ev.channel === stackComparison.bestChannel;
             return (
@@ -618,11 +607,11 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '8px',
+                    gap: '4px',
                     flexWrap: 'wrap',
                   }}
                 >
-                  <strong style={{ fontSize: '0.94rem' }}>{ev.channelLabel}</strong>
+                  <strong style={{ fontSize: '0.8rem' }}>{ev.channelLabel}</strong>
                   {isBest && (
                     <span className="readiness-badge is-ready" data-testid="winning-channel-badge">
                       Kênh Rẻ Nhất
@@ -632,27 +621,30 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
 
                 <div
                   className="tabular-nums"
-                  style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}
+                  style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}
                 >
-                  Sau Mã Shop: <strong>{formatVnd(ev.afterShopVnd)}</strong> • Giảm Tầng 2:{' '}
-                  <strong style={{ color: '#6ee7b7' }}>-{formatVnd(ev.platformDiscountVnd)}</strong>{' '}
-                  • Thanh toán cuối:{' '}
-                  <strong style={{ color: '#fbbf24', fontSize: '0.98rem' }}>
-                    {formatVnd(ev.finalPayableVnd)}
-                  </strong>
+                  <div>Sau Shop: {formatVnd(ev.afterShopVnd)}</div>
+                  <div>Giảm T2: <strong style={{ color: '#6ee7b7' }}>-{formatVnd(ev.platformDiscountVnd)}</strong></div>
+                  <div style={{ marginTop: '2px' }}>
+                    Trả cuối:{' '}
+                    <strong style={{ color: '#fbbf24', fontSize: '0.86rem' }}>
+                      {formatVnd(ev.finalPayableVnd)}
+                    </strong>
+                  </div>
                 </div>
 
                 {!ev.platformEligible && ev.platformShortfallVnd > 0 && (
                   <div
                     className="shortfall-alert tabular-nums"
                     data-testid={`shortfall-alert-${ev.channel}`}
+                    style={{ fontSize: '0.72rem', padding: '4px 6px', marginTop: '2px' }}
                   >
                     {ev.actionGuide}
                   </div>
                 )}
 
                 {(ev.platformEligible || ev.platformShortfallVnd === 0) && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                     {ev.actionGuide}
                   </div>
                 )}
@@ -682,7 +674,6 @@ export const VoucherMaxHub: React.FC<VoucherMaxHubProps> = ({
             <span>Khung giờ canh:</span>
             <select
               className="select-input tabular-nums"
-              style={{ minHeight: '48px' }}
               value={reminderSlot}
               onChange={(e) => setReminderSlot(e.target.value)}
             >

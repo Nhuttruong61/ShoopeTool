@@ -178,8 +178,7 @@ export const CartOptimizer: React.FC<CartOptimizerProps> = ({
         </div>
         <button
           type="button"
-          className="btn btn-outline-accent"
-          style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.84rem' }}
+          className="btn btn-outline-accent btn-sm"
           onClick={handleLoadSample}
         >
           Nạp giỏ mẫu thử
@@ -493,7 +492,6 @@ export const CartOptimizer: React.FC<CartOptimizerProps> = ({
             <span>Khung giờ săn:</span>
             <select
               className="select-input tabular-nums"
-              style={{ minHeight: '48px' }}
               value={importSlotTime}
               onChange={(e) => setImportSlotTime(e.target.value)}
             >

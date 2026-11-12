@@ -9,6 +9,7 @@ export interface RunbookListProps {
   onToggleChecklist: (id: string, key: keyof RunbookChecklist) => void;
   onCopyCode: (item: DealRunbookItem) => void;
   onCopyAndOpenShopee: (item: DealRunbookItem) => void;
+  onOpenCart?: (item: DealRunbookItem) => void;
   onToggleCompleted: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -16,11 +17,38 @@ export interface RunbookListProps {
 const CHECKLIST_STEPS: ReadonlyArray<{
   key: keyof RunbookChecklist;
   label: string;
+  shortLabel: string;
 }> = [
-  { key: 'itemsTickedInCart', label: '1. Đã tick sẵn món trong Giỏ' },
-  { key: 'waitingAtCheckoutScreen', label: '2. Đang đứng chờ ở màn Thanh Toán' },
-  { key: 'paymentMethodSelected', label: '3. Đã chọn ShopeePay / SPayLater' },
+  {
+    key: 'itemsTickedInCart',
+    label: '1. Đã tick sẵn món trong Giỏ',
+    shortLabel: '1. Tick giỏ',
+  },
+  {
+    key: 'waitingAtCheckoutScreen',
+    label: '2. Đang đứng chờ ở màn Thanh Toán',
+    shortLabel: '2. Thanh toán',
+  },
+  {
+    key: 'paymentMethodSelected',
+    label: '3. Đã chọn ShopeePay / SPayLater',
+    shortLabel: '3. Chọn ví/TT',
+  },
 ];
+
+export function getDestinationHint(url?: string): string {
+  if (!url) return '';
+  if (url.includes('ma-giam-gia')) return 'Kho Mã';
+  if (url.includes('voucher-xtra')) return 'Xtra';
+  if (url.includes('mien-phi-van-chuyen')) return 'Freeship';
+  if (url.includes('shopee-live')) return 'Live';
+  if (url.includes('shopee-video')) return 'Video';
+  if (url.includes('shopeepay')) return 'ShopeePay';
+  if (url.includes('uu-dai-doi-tac')) return 'Ngân hàng';
+  if (url.includes('shopee-rewards')) return 'Rewards';
+  if (url.includes('cart')) return 'Giỏ hàng';
+  return 'Shopee';
+}
 
 export const RunbookList: React.FC<RunbookListProps> = ({
   items,
@@ -30,16 +58,17 @@ export const RunbookList: React.FC<RunbookListProps> = ({
   onToggleChecklist,
   onCopyCode,
   onCopyAndOpenShopee,
+  onOpenCart,
   onToggleCompleted,
   onDelete,
 }) => {
   if (items.length === 0) {
     return (
       <section className="section-card" aria-label="Danh sách kịch bản săn mã">
-        <div className="section-header">
-          <h2 className="section-title">Kịch Bản Săn Mã (Pre-flight Runbook)</h2>
+        <div className="section-header" style={{ marginBottom: 4 }}>
+          <h2 className="section-title">Kịch Bản Săn Mã (0 ca)</h2>
         </div>
-        <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.92rem' }}>
+        <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.85rem' }}>
           Chưa có ca săn mã nào. Hãy thêm ca săn mới hoặc nạp từ Bộ Tối Ưu Giỏ Hàng!
         </p>
       </section>
@@ -47,11 +76,13 @@ export const RunbookList: React.FC<RunbookListProps> = ({
   }
 
   return (
-    <section className="section-card" aria-label="Danh sách kịch bản săn mã">
-      <div className="section-header">
-        <h2 className="section-title">Kịch Bản Săn Mã ({items.length} ca)</h2>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Hoàn thành 3/3 bước chuẩn bị trước giờ mở mã
+    <section className="runbook-container" aria-label="Danh sách kịch bản săn mã">
+      <div className="runbook-header-compact">
+        <h2 className="section-title" style={{ fontSize: '0.92rem', margin: 0 }}>
+          Kịch Bản Săn Mã ({items.length} ca)
+        </h2>
+        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+          Hoàn thành 3/3 bước trước giờ mở mã
         </span>
       </div>
 
@@ -65,6 +96,7 @@ export const RunbookList: React.FC<RunbookListProps> = ({
             item.checklist.paymentMethodSelected,
           ].filter(Boolean).length;
           const isAllReady = readyCount === 3;
+          const destHint = getDestinationHint(item.shopeeUrl);
 
           const cardClass = [
             'runbook-card',
@@ -80,67 +112,107 @@ export const RunbookList: React.FC<RunbookListProps> = ({
               className={cardClass}
               data-testid={`runbook-card-${item.id}`}
             >
+              {/* Header row (1 tight flex line) */}
               <div className="runbook-card-header">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div className="runbook-meta-row">
-                    <span className="slot-pill">{item.slotTime}</span>
-                    <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800 }}>
-                      {item.title}
-                    </h3>
-                    <span
-                      className={`readiness-badge tabular-nums ${isAllReady ? 'is-ready' : ''}`}
-                      data-testid={`readiness-badge-${item.id}`}
-                    >
-                      Sẵn sàng {readyCount}/3
-                    </span>
-                  </div>
+                <span className="slot-pill">{item.slotTime}</span>
+                <h3 className="runbook-title" title={item.title}>
+                  {item.title}
+                </h3>
+                <span
+                  className={`readiness-badge tabular-nums ${isAllReady ? 'is-ready' : ''}`}
+                  data-testid={`readiness-badge-${item.id}`}
+                >
+                  {readyCount}/3
+                </span>
+                <button
+                  type="button"
+                  className={`btn runbook-select-btn ${
+                    isActive ? 'btn-active-toggle' : 'btn-outline-accent'
+                  }`}
+                  onClick={() => onSelectActive(item.id)}
+                >
+                  {isActive ? 'Đang canh ca này' : 'Chọn canh giờ'}
+                </button>
+              </div>
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '8px',
-                      fontSize: '0.84rem',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <span>
-                      Món tick: <strong>{item.itemsSummary || 'Chưa ghi chú món'}</strong>
+              {/* Compact 1-line meta + inline actions row */}
+              <div className="runbook-meta-action-row">
+                <div className="runbook-meta-inline">
+                  {item.voucherCode ? (
+                    <span className="voucher-code-pill">Mã: {item.voucherCode}</span>
+                  ) : (
+                    <span className="wallet-voucher-badge">
+                      Mã lưu trong Ví Shopee
                     </span>
-                    <span>•</span>
-                    <span>
-                      Thanh toán: <strong>{item.paymentMethod}</strong>
+                  )}
+                  <span className="runbook-meta-pay">• {item.paymentMethod}</span>
+                  {destHint && (
+                    <span className="dest-pill" title={item.shopeeUrl}>
+                      🎯 {destHint}
                     </span>
-                  </div>
-
-                  <div className="runbook-meta-row">
-                    {item.voucherCode ? (
-                      <span className="voucher-code-pill">Mã: {item.voucherCode}</span>
-                    ) : (
-                      <span className="wallet-voucher-badge">
-                        Mã lưu trong Ví Shopee
-                      </span>
-                    )}
-                    {item.voucherNote && (
-                      <span style={{ fontSize: '0.82rem', color: '#fde68a' }}>
-                        ({item.voucherNote})
-                      </span>
-                    )}
-                  </div>
+                  )}
+                  {item.voucherNote && (
+                    <span className="runbook-verbose-meta" style={{ color: '#fde68a', fontSize: '0.72rem' }}>
+                      ({item.voucherNote})
+                    </span>
+                  )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div className="runbook-inline-actions">
+                  {item.voucherCode && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onCopyCode(item)}
+                    >
+                      {isCopied
+                        ? `Đã Copy: ${item.voucherCode}`
+                        : `Copy Mã (${item.voucherCode})`}
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    className={`btn ${isActive ? 'btn-active-toggle' : 'btn-outline-accent'}`}
-                    style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.82rem' }}
-                    onClick={() => onSelectActive(item.id)}
+                    className="btn btn-primary btn-sm"
+                    onClick={() => onCopyAndOpenShopee(item)}
                   >
-                    {isActive ? 'Đang canh ca này' : 'Chọn canh giờ'}
+                    {item.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
+                  </button>
+
+                  {onOpenCart && destHint !== 'Giỏ hàng' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm btn-cart"
+                      onClick={() => onOpenCart(item)}
+                      title="Mở thẳng Giỏ Hàng Shopee"
+                    >
+                      🛒 Giỏ hàng
+                    </button>
+                  )}
+
+                  <label className="runbook-done-check" title="Đánh dấu đã săn xong">
+                    <input
+                      type="checkbox"
+                      aria-label="Đánh dấu đã săn xong"
+                      checked={item.completed}
+                      onChange={() => onToggleCompleted(item.id)}
+                    />
+                    <span>Xong</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    className="btn-delete-card"
+                    aria-label="Xóa ca"
+                    title="Xóa ca săn này"
+                    onClick={() => onDelete(item.id)}
+                  >
+                    ✕
                   </button>
                 </div>
               </div>
 
+              {/* 3-Step Checklist as single horizontal 3-column pill row */}
               <div className="checklist-box" role="group" aria-label={`Checklist ${item.title}`}>
                 {CHECKLIST_STEPS.map((step) => {
                   const checked = item.checklist[step.key];
@@ -148,79 +220,18 @@ export const RunbookList: React.FC<RunbookListProps> = ({
                     <label
                       key={step.key}
                       className={`checklist-item ${checked ? 'checked' : ''}`}
+                      title={step.label}
                     >
                       <input
                         type="checkbox"
+                        aria-label={step.label}
                         checked={checked}
                         onChange={() => onToggleChecklist(item.id, step.key)}
                       />
-                      <span>{step.label}</span>
+                      <span>{step.shortLabel}</span>
                     </label>
                   );
                 })}
-              </div>
-
-              <div
-                className="runbook-actions"
-                style={item.voucherCode ? undefined : { gridTemplateColumns: '1fr' }}
-              >
-                {item.voucherCode && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => onCopyCode(item)}
-                  >
-                    {isCopied
-                      ? `Đã Copy: ${item.voucherCode}`
-                      : `Copy Mã (${item.voucherCode})`}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => onCopyAndOpenShopee(item)}
-                >
-                  {item.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
-                </button>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '8px',
-                  paddingTop: '4px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                }}
-              >
-                <label
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '0.82rem',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={item.completed}
-                    onChange={() => onToggleCompleted(item.id)}
-                  />
-                  <span>Đánh dấu đã săn xong</span>
-                </label>
-
-                <button
-                  type="button"
-                  className="btn btn-danger-ghost"
-                  style={{ minHeight: '36px', padding: '4px 10px', fontSize: '0.8rem' }}
-                  onClick={() => onDelete(item.id)}
-                >
-                  Xóa ca
-                </button>
               </div>
             </article>
           );

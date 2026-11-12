@@ -265,6 +265,17 @@ export function App() {
     }
   };
 
+  const handleOpenCart = async (item: DealRunbookItem) => {
+    const res = await copyAndLaunchShopee({
+      voucherCode: item.voucherCode || undefined,
+      targetUrl: 'https://shopee.vn/cart',
+      mode: openMode,
+    });
+    if (res.copied?.ok) {
+      setCopiedId(item.id);
+    }
+  };
+
   const handleOpenShopeeUrl = async (url: string, voucherCode?: string) => {
     await copyAndLaunchShopee({
       voucherCode,
@@ -371,6 +382,7 @@ export function App() {
           ? `${g.appliedVoucher.label} • Thanh toán ${formatVnd(g.finalPayableVnd)}`
           : `Chưa áp voucher • Thanh toán ${formatVnd(g.finalPayableVnd)}`,
         paymentMethod: g.appliedVoucher?.paymentNote ?? 'ShopeePay',
+        shopeeUrl: 'https://shopee.vn/cart',
         checklist: emptyChecklist(),
         completed: false,
       }));
@@ -398,7 +410,7 @@ export function App() {
       onTouchStartCapture={unlockAudioOnce}
     >
       <header className="app-header">
-        <div>
+        <div className="app-header-left">
           <h1 className="app-title">ShoopeeTool 365 — Trợ Lý Săn Mã &amp; Canh Nhịp Shopee</h1>
           <p className="app-subtitle">
             Canh giờ chuẩn 0.1s, mở thẳng kho mã thật trong App Shopee &amp; tối ưu chồng 3 tầng mã
@@ -407,12 +419,13 @@ export function App() {
         </div>
 
         <label
+          className="open-mode-label"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.78rem',
+            fontSize: '0.74rem',
             color: 'var(--text-secondary)',
+            flexShrink: 0,
           }}
         >
           <select
@@ -449,12 +462,13 @@ export function App() {
         }}
         onToggleAudio={handleToggleAudio}
         onQuickCopyAndOpen={(d) => void handleCopyAndOpen(d)}
+        onQuickOpenCart={(d) => void handleOpenCart(d)}
       />
 
       <nav
         role="tablist"
         aria-label="Điều hướng chức năng"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}
+        className="tab-bar"
       >
         {TABS.map((t) => (
           <button
@@ -462,7 +476,7 @@ export function App() {
             type="button"
             role="tab"
             aria-selected={tab === t.key}
-            className={`btn ${tab === t.key ? 'btn-primary' : 'btn-secondary'}`}
+            className={`tab-btn ${tab === t.key ? 'active' : ''}`}
             onClick={() => setTab(t.key)}
           >
             {t.label}
@@ -479,6 +493,7 @@ export function App() {
           onToggleChecklist={handleToggleChecklist}
           onCopyCode={(i) => void handleCopyCode(i)}
           onCopyAndOpenShopee={(i) => void handleCopyAndOpen(i)}
+          onOpenCart={(i) => void handleOpenCart(i)}
           onToggleCompleted={handleToggleCompleted}
           onDelete={handleDelete}
         />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type {
   DealRunbookItem,
   PipSupportInfo,
@@ -6,6 +6,7 @@ import type {
   TimePhase,
   TimeSyncSnapshot,
 } from '../types/contracts';
+import { getDestinationHint } from './RunbookList';
 
 export interface LiveStrikeBarProps {
   countdown: StrikeCountdownState;
@@ -24,15 +25,16 @@ export interface LiveStrikeBarProps {
   onToggleFullscreenHud: () => void;
   onToggleAudio: () => void;
   onQuickCopyAndOpen?: (deal: DealRunbookItem) => void;
+  onQuickOpenCart?: (deal: DealRunbookItem) => void;
 }
 
 export const PHASE_LABELS: Record<TimePhase, string> = {
   IDLE: 'CHỜ KHUNG GIỜ',
-  PREPARE_60S: 'CHUẨN BỊ VÀO THANH TOÁN (60s)',
-  READY_10S: 'SẴN SÀNG TAY BẤM (10s)',
-  COUNTDOWN_3S: 'ĐẾM NGƯỢC 3 GIÂY!',
-  STRIKE_NOW: 'BẤM ĐẶT HÀNG NGAY!',
-  PASSED: 'ĐÃ QUA MỐC GIỜ',
+  PREPARE_60S: 'CHUẨN BỊ (60s)',
+  READY_10S: 'SẴN SÀNG (10s)',
+  COUNTDOWN_3S: 'ĐẾM NGƯỢC 3s!',
+  STRIKE_NOW: 'BẤM NGAY!',
+  PASSED: 'ĐÃ QUA GIỜ',
 };
 
 export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
@@ -52,8 +54,11 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
   onToggleFullscreenHud,
   onToggleAudio,
   onQuickCopyAndOpen,
+  onQuickOpenCart,
 }) => {
+  const [showTuning, setShowTuning] = useState(false);
   const phaseLabel = PHASE_LABELS[countdown.phase] ?? PHASE_LABELS.IDLE;
+  const activeDestHint = activeDeal ? getDestinationHint(activeDeal.shopeeUrl) : '';
 
   const containerClassName = [
     'strike-bar',
@@ -68,204 +73,270 @@ export const LiveStrikeBar: React.FC<LiveStrikeBarProps> = ({
       ? `+${Math.round(syncState.offsetMs)}ms`
       : `${Math.round(syncState.offsetMs)}ms`;
 
-  return (
-    <section className={containerClassName} aria-label="Đồng hồ canh nhịp săn mã">
-      <div className="strike-header-row">
-        <span className="phase-badge" data-testid="phase-badge">
-          {phaseLabel}
-        </span>
+  const renderActiveDealBar = () =>
+    activeDeal ? (
+      <div className="active-deal-summary" data-testid="active-deal-banner">
+        <div className="active-deal-left">
+          <span className="slot-pill">{activeDeal.slotTime}</span>
+          <strong className="active-deal-title" title={activeDeal.title}>
+            {activeDeal.title}
+          </strong>
+          {activeDeal.voucherCode ? (
+            <span className="voucher-code-pill">Mã: {activeDeal.voucherCode}</span>
+          ) : (
+            <span className="wallet-voucher-badge">Mã lưu trong Ví Shopee</span>
+          )}
+          {activeDestHint && (
+            <span className="dest-pill" title={activeDeal.shopeeUrl}>
+              🎯 {activeDestHint}
+            </span>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span
-            className="tabular-nums"
-            style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}
-          >
-            {syncState.synced
-              ? `Đã đồng bộ (${syncState.source}) • Lệch ${formattedOffset}${
-                  syncState.rttMs !== null ? ` • RTT ${Math.round(syncState.rttMs)}ms` : ''
-                }`
-              : `Giờ máy (${syncState.source})`}
-          </span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ minHeight: '36px', padding: '4px 10px', fontSize: '0.8rem' }}
-            onClick={onSyncNow}
-          >
-            Đồng bộ lại
-          </button>
-          {isFullscreenHud && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          {onQuickCopyAndOpen && (
             <button
               type="button"
-              className="btn btn-danger-ghost"
-              style={{ minHeight: '36px', padding: '4px 10px', fontSize: '0.8rem' }}
-              onClick={onToggleFullscreenHud}
+              className="btn btn-primary active-deal-open-btn"
+              onClick={() => onQuickCopyAndOpen(activeDeal)}
             >
-              Thoát HUD
+              {activeDeal.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
+            </button>
+          )}
+          {onQuickOpenCart && activeDestHint !== 'Giỏ hàng' && (
+            <button
+              type="button"
+              className="btn btn-secondary active-deal-open-btn"
+              onClick={() => onQuickOpenCart(activeDeal)}
+              title="Mở thẳng Giỏ Hàng Shopee"
+            >
+              🛒
             </button>
           )}
         </div>
       </div>
-
-      <div className="clock-main-box">
-        <div className="clock-display tabular-nums" data-testid="live-clock">
-          {countdown.formattedClock}
-        </div>
-        <div className="countdown-row">
-          <span className="countdown-label">Còn lại đến mốc mở mã:</span>
-          <span className="countdown-display tabular-nums" data-testid="live-countdown">
-            {countdown.formattedRemaining}
-          </span>
-        </div>
+    ) : (
+      <div className="active-deal-summary" data-testid="active-deal-empty">
+        <span className="active-deal-empty-text">Chưa chọn ca săn mục tiêu</span>
       </div>
+    );
 
-      {activeDeal ? (
-        <div className="active-deal-summary" data-testid="active-deal-banner">
-          <div className="active-deal-top">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span className="slot-pill">{activeDeal.slotTime}</span>
-              <strong style={{ fontSize: '0.95rem' }}>{activeDeal.title}</strong>
-            </div>
-            {activeDeal.voucherCode ? (
-              <span className="voucher-code-pill">Mã: {activeDeal.voucherCode}</span>
-            ) : (
-              <span className="wallet-voucher-badge">
-                Mã lưu trong Ví Shopee
-              </span>
-            )}
-          </div>
+  const renderPipErrorBanner = () =>
+    pipError ? (
+      <div
+        className="shortfall-alert"
+        style={{
+          marginTop: '6px',
+          padding: '6px 8px',
+          fontSize: '0.76rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+        }}
+        data-testid="pip-error-banner"
+      >
+        <span>{pipError}</span>
+        {onMountInlinePipVideo && (
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              flexWrap: 'wrap',
-              fontSize: '0.84rem',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <span>
-              Món: <strong>{activeDeal.itemsSummary || 'Đã chọn trong giỏ'}</strong> • TT:{' '}
-              <strong>{activeDeal.paymentMethod}</strong>
-            </span>
-            {onQuickCopyAndOpen && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ minHeight: '48px', padding: '8px 14px', fontSize: '0.85rem' }}
-                onClick={() => onQuickCopyAndOpen(activeDeal)}
-              >
-                {activeDeal.voucherCode ? 'Copy Mã + Mở App Shopee' : 'Mở App Shopee'}
-              </button>
-            )}
+            ref={(el) => onMountInlinePipVideo(el)}
+            style={{ display: 'flex', justifyContent: 'center' }}
+            data-testid="inline-pip-video-slot"
+          />
+        )}
+      </div>
+    ) : null;
+
+  if (isFullscreenHud) {
+    return (
+      <section className={containerClassName} aria-label="Đồng hồ canh nhịp săn mã">
+        <div className="strike-header-row">
+          <span className="phase-badge" data-testid="phase-badge">
+            {phaseLabel}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${audioEnabled ? 'btn-active-toggle' : 'btn-secondary'}`}
+              onClick={onToggleAudio}
+              aria-pressed={audioEnabled}
+            >
+              {audioEnabled ? 'Âm: BẬT' : 'Âm: TẮT'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger-ghost btn-sm"
+              onClick={onToggleFullscreenHud}
+            >
+              Thoát HUD
+            </button>
           </div>
         </div>
-      ) : (
-        <div className="active-deal-summary" data-testid="active-deal-empty">
-          <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            Chưa chọn ca săn mã mục tiêu. Hãy chọn 1 ca bên dưới để bắt đầu đếm ngược.
+
+        <div className="clock-main-box">
+          <div className="clock-display tabular-nums" data-testid="live-clock">
+            {countdown.formattedClock}
+          </div>
+          <div className="countdown-row">
+            <span className="countdown-label">Còn lại:</span>
+            <span className="countdown-display tabular-nums" data-testid="live-countdown">
+              {countdown.formattedRemaining}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          {renderActiveDealBar()}
+          {renderPipErrorBanner()}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={containerClassName} aria-label="Đồng hồ canh nhịp săn mã">
+      {/* Row 1: Compact Horizontal Bar */}
+      <div className="strike-row-1">
+        <div className="strike-clock-box">
+          <span className="clock-display tabular-nums" data-testid="live-clock">
+            {countdown.formattedClock}
+          </span>
+          <span className="countdown-inline tabular-nums">
+            Còn:{' '}
+            <strong className="countdown-display" data-testid="live-countdown">
+              {countdown.formattedRemaining}
+            </strong>
           </span>
         </div>
-      )}
 
-      <div className="controls-grid">
-        <div className="slider-card">
-          <label className="slider-header" htmlFor="lead-ms-slider">
-            <span>Báo sớm bù phản xạ tay (0–2000ms, mặc định 300ms)</span>
-            <span className="slider-val tabular-nums">{countdown.leadMs}ms</span>
-          </label>
-          <input
-            id="lead-ms-slider"
-            type="range"
-            className="range-input"
-            min={0}
-            max={2000}
-            step={50}
-            value={countdown.leadMs}
-            onChange={(e) => onLeadMsChange(Number(e.target.value))}
-          />
+        <span className="phase-badge" data-testid="phase-badge">
+          {phaseLabel}
+        </span>
+      </div>
+
+      {/* Row 2: Compact Active Deal + Quick Controls in 1 tight grid/flex */}
+      <div className="strike-row-2">
+        {renderActiveDealBar()}
+
+        <div className="strike-controls-strip">
+          <button
+            type="button"
+            className={`btn btn-sm ${isPipActive ? 'btn-active-toggle' : 'btn-secondary'}`}
+            onClick={onTogglePip}
+            aria-pressed={isPipActive}
+            title="Đồng hồ nổi PiP"
+          >
+            {isPipActive ? '✓ PiP' : '⧉ PiP'}
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${isFullscreenHud ? 'btn-active-toggle' : 'btn-secondary'}`}
+            onClick={onToggleFullscreenHud}
+            aria-pressed={isFullscreenHud}
+            title="Toàn màn hình HUD"
+          >
+            HUD
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${audioEnabled ? 'btn-active-toggle' : 'btn-secondary'}`}
+            onClick={onToggleAudio}
+            aria-pressed={audioEnabled}
+            title="Âm báo nhịp"
+          >
+            {audioEnabled ? 'Âm: BẬT' : 'Âm: TẮT'}
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${showTuning ? 'btn-active-toggle' : 'btn-secondary'}`}
+            onClick={() => setShowTuning((v) => !v)}
+            aria-expanded={showTuning}
+            title="Tinh chỉnh nhịp phản xạ & đồng bộ"
+          >
+            ⚙️ Nhịp ({countdown.leadMs >= 0 ? `+${countdown.leadMs}` : countdown.leadMs}ms)
+          </button>
         </div>
+      </div>
 
-        <div className="slider-card">
-          <label className="slider-header" htmlFor="manual-adjust-slider">
-            <span>Tinh chỉnh lệch giờ thủ công (-2000ms..+2000ms)</span>
-            <span className="slider-val tabular-nums">
-              {syncState.manualAdjustMs >= 0
-                ? `+${syncState.manualAdjustMs}ms`
-                : `${syncState.manualAdjustMs}ms`}
+      {/* Collapsible Settings Drawer */}
+      {showTuning && (
+        <div className="strike-tuning-drawer">
+          <div className="controls-grid">
+            <div className="slider-card">
+              <label className="slider-header" htmlFor="lead-ms-slider">
+                <span>Báo sớm bù phản xạ tay (0–2000ms)</span>
+                <span className="slider-val tabular-nums">{countdown.leadMs}ms</span>
+              </label>
+              <input
+                id="lead-ms-slider"
+                type="range"
+                className="range-input"
+                min={0}
+                max={2000}
+                step={50}
+                value={countdown.leadMs}
+                onChange={(e) => onLeadMsChange(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="slider-card">
+              <label className="slider-header" htmlFor="manual-adjust-slider">
+                <span>Tinh chỉnh lệch giờ thủ công (-2000ms..+2000ms)</span>
+                <span className="slider-val tabular-nums">
+                  {syncState.manualAdjustMs >= 0
+                    ? `+${syncState.manualAdjustMs}ms`
+                    : `${syncState.manualAdjustMs}ms`}
+                </span>
+              </label>
+              <input
+                id="manual-adjust-slider"
+                type="range"
+                className="range-input"
+                min={-2000}
+                max={2000}
+                step={50}
+                value={syncState.manualAdjustMs}
+                onChange={(e) => onManualAdjustChange(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <div className="strike-sync-footer">
+            <span
+              className="tabular-nums"
+              style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}
+            >
+              {syncState.synced
+                ? `Đã đồng bộ (${syncState.source}) • Lệch ${formattedOffset}${
+                    syncState.rttMs !== null ? ` • RTT ${Math.round(syncState.rttMs)}ms` : ''
+                  }`
+                : `Giờ máy (${syncState.source})`}
             </span>
-          </label>
-          <input
-            id="manual-adjust-slider"
-            type="range"
-            className="range-input"
-            min={-2000}
-            max={2000}
-            step={50}
-            value={syncState.manualAdjustMs}
-            onChange={(e) => onManualAdjustChange(Number(e.target.value))}
-          />
-        </div>
-      </div>
-
-      <div className="action-buttons-grid">
-        <button
-          type="button"
-          className={`btn ${isPipActive ? 'btn-active-toggle' : 'btn-primary'}`}
-          onClick={onTogglePip}
-          aria-pressed={isPipActive}
-        >
-          {isPipActive ? 'Đang Bật Đồng Hồ Nổi (PiP)' : 'Bật Đồng Hồ Nổi (PiP)'}
-        </button>
-
-        <button
-          type="button"
-          className={`btn ${isFullscreenHud ? 'btn-active-toggle' : 'btn-secondary'}`}
-          onClick={onToggleFullscreenHud}
-          aria-pressed={isFullscreenHud}
-        >
-          Chế độ Toàn Màn Hình (HUD)
-        </button>
-
-        <button
-          type="button"
-          className={`btn ${audioEnabled ? 'btn-active-toggle' : 'btn-secondary'}`}
-          onClick={onToggleAudio}
-          aria-pressed={audioEnabled}
-        >
-          Âm Báo Nhịp: {audioEnabled ? 'BẬT' : 'TẮT'}
-        </button>
-      </div>
-
-      {pipError && (
-        <div
-          className="shortfall-alert"
-          style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}
-          data-testid="pip-error-banner"
-        >
-          <span>{pipError}</span>
-          {onMountInlinePipVideo && (
-            <div
-              ref={(el) => onMountInlinePipVideo(el)}
-              style={{ display: 'flex', justifyContent: 'center' }}
-              data-testid="inline-pip-video-slot"
-            />
-          )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onSyncNow}
+            >
+              Đồng bộ lại
+            </button>
+          </div>
         </div>
       )}
+
+      {renderPipErrorBanner()}
 
       {pipSupport.fallbackHudOnly && !pipError && (
         <p
           style={{
-            margin: '10px 0 0',
-            fontSize: '0.78rem',
+            margin: '6px 0 0',
+            fontSize: '0.72rem',
             color: '#fde68a',
             textAlign: 'center',
           }}
         >
-          Trình duyệt này hạn chế cửa sổ nổi Canvas PiP — khuyến nghị bật{' '}
-          <strong>Chế độ Toàn Màn Hình (HUD)</strong> kèm <strong>Âm Báo Nhịp</strong>.
+          Trình duyệt hạn chế Canvas PiP — nên dùng HUD + Âm báo.
         </p>
       )}
     </section>

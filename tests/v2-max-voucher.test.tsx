@@ -36,18 +36,29 @@ describe('v2.0 Max Voucher 365 & Native App Deep-Link Verification', () => {
     }
 
     // Verify legacy localStorage containing old fake codes is automatically scrubbed to ''
+    // AND legacy shopeeUrl: 'https://shopee.vn/cart' (or missing shopeeUrl) + old 11/11 titles on preset IDs migrate cleanly
     const legacyStored = [
       {
         ...DEFAULT_11_11_RUNBOOK[0],
         voucherCode: 'SHOPEE1111TS100K',
+        shopeeUrl: 'https://shopee.vn/cart',
       },
       {
         ...DEFAULT_11_11_RUNBOOK[1],
         voucherCode: 'XTRA1111G15',
+        shopeeUrl: undefined,
       },
       {
         ...DEFAULT_11_11_RUNBOOK[2],
         voucherCode: 'USER_REAL_CODE_99K',
+        shopeeUrl: 'https://shopee.vn/cart',
+      },
+      {
+        ...DEFAULT_11_11_RUNBOOK[3],
+        title: 'Mã Live 11/11',
+        itemsSummary: 'Chuột không dây gaming (rổ Live)',
+        voucherCode: '',
+        shopeeUrl: 'https://shopee.vn/cart',
       },
     ];
     window.localStorage.setItem(STORAGE_KEYS.RUNBOOK_ITEMS, JSON.stringify(legacyStored));
@@ -56,15 +67,32 @@ describe('v2.0 Max Voucher 365 & Native App Deep-Link Verification', () => {
     expect(scrubbed[0].voucherCode).toBe('');
     expect(scrubbed[1].voucherCode).toBe('');
     expect(scrubbed[2].voucherCode).toBe('USER_REAL_CODE_99K');
+    expect(scrubbed[0].shopeeUrl).toBe('https://shopee.vn/m/ma-giam-gia');
+    expect(scrubbed[1].shopeeUrl).toBe('https://shopee.vn/m/voucher-xtra');
+    expect(scrubbed[2].shopeeUrl).toBe('https://shopee.vn/m/mien-phi-van-chuyen');
+    expect(scrubbed[3].shopeeUrl).toBe('https://shopee.vn/m/shopee-live');
+    expect(scrubbed[3].title).not.toContain('11/11');
   });
 
-  it('displays "Mã lưu trong Ví Shopee" and "Mở App Shopee" when voucherCode is empty (no misleading Copy Mã)', () => {
+  it('displays "Mã lưu trong Ví Shopee" and "Mở App Shopee" when voucherCode is empty and opens voucher hub not cart', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
     render(<App />);
     expect(screen.getAllByText('Mã lưu trong Ví Shopee').length).toBeGreaterThanOrEqual(4);
-    expect(screen.getAllByRole('button', { name: 'Mở App Shopee' }).length).toBeGreaterThanOrEqual(
-      4,
-    );
+    const openBtns = screen.getAllByRole('button', { name: 'Mở App Shopee' });
+    expect(openBtns.length).toBeGreaterThanOrEqual(4);
     expect(screen.queryByRole('button', { name: /^Copy Mã/ })).not.toBeInTheDocument();
+
+    // Clicking "Mở App Shopee" opens https://shopee.vn/m/ma-giam-gia (NOT /cart)
+    fireEvent.click(openBtns[0]);
+    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+    expect(openSpy.mock.calls[0][0]).toBe('https://shopee.vn/m/ma-giam-gia');
+
+    // Clicking dedicated "🛒 Giỏ hàng" button explicitly opens https://shopee.vn/cart
+    const cartBtns = screen.getAllByRole('button', { name: /Giỏ hàng/ });
+    expect(cartBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(cartBtns[0]);
+    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(2));
+    expect(openSpy.mock.calls[1][0]).toBe('https://shopee.vn/cart');
   });
 
   it('renders VoucherMaxHub with 8 official Shopee hubs and triggers native app launcher', async () => {
